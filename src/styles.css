@@ -13,6 +13,10 @@
   --live: #34d399;
   --proxy: #a78bfa;
   --danger: #f87171;
+  /* 三类延迟/路由数据：模型估算、站长实测、锚点参考 */
+  --src-estimate: #94a3b8;
+  --src-mine: #34d399;
+  --src-atlas: #a78bfa;
   --radius: 10px;
   --panel-width: 440px;
   --chip-bg: rgba(9, 14, 25, 0.7);
@@ -36,6 +40,9 @@
   --land: #c2410c;
   --live: #047857;
   --proxy: #6d28d9;
+  --src-estimate: #64748b;
+  --src-mine: #047857;
+  --src-atlas: #6d28d9;
   --chip-bg: rgba(255, 255, 255, 0.8);
   --tip-bg: rgba(255, 255, 255, 0.97);
   --input-bg: rgba(255, 255, 255, 0.9);
@@ -56,6 +63,10 @@ body,
   color: var(--text);
   font: 14px/1.5 system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+/* 收起的侧栏停在屏幕外；clip 让它们也不能被 focus/scrollIntoView 把整页横向滚过去 */
+#root {
+  overflow: clip;
 }
 
 a {
@@ -353,6 +364,15 @@ button {
   background: #f472b6;
   box-shadow: 0 0 0 2px rgba(244, 114, 182, 0.3);
 }
+.marker-hop-mine {
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+}
+.marker-hop-atlas {
+  background: #8b5cf6;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.3);
+  color: #fff;
+}
 .marker-probe {
   width: 20px;
   height: 20px;
@@ -534,18 +554,24 @@ button {
   margin-top: 8px;
 }
 .section-head {
-  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.section-toggle {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 2px;
   border: none;
-  border-bottom: 1px solid var(--border);
   background: none;
   cursor: pointer;
   text-align: left;
 }
-.section-head:hover .section-title {
+.section-toggle:hover .section-title {
   color: var(--sub);
 }
 .section-chevron {
@@ -609,20 +635,6 @@ button {
 
 /* 站长实测 */
 
-.callout-strong {
-  border-color: color-mix(in srgb, var(--land) 45%, transparent);
-  border-left-color: var(--land);
-  background: color-mix(in srgb, var(--land) 9%, transparent);
-}
-.callout-strong b {
-  display: block;
-  margin-bottom: 4px;
-  color: var(--land);
-}
-.callout-strong p {
-  font-size: 12.5px;
-  color: var(--text);
-}
 .mine-target {
   font-size: 13px;
   margin: 0 0 10px;
@@ -723,7 +735,7 @@ button {
 .region-row {
   width: 100%;
   display: grid;
-  grid-template-columns: 10px 1fr 74px;
+  grid-template-columns: 10px 1fr 88px;
   gap: 10px;
   align-items: center;
   padding: 9px 10px;
@@ -764,18 +776,37 @@ button {
 }
 .region-rtt {
   position: relative;
-  text-align: right;
+  display: grid;
+  justify-items: end;
+  gap: 1px;
   font-variant-numeric: tabular-nums;
   padding-bottom: 5px;
 }
+.rtt-line {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  white-space: nowrap;
+}
+.rtt-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--src);
+  border: 1px solid color-mix(in srgb, var(--src) 45%, transparent);
+  border-radius: 4px;
+  padding: 0 3px;
+  line-height: 14px;
+}
 .rtt-value {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
+}
+.rtt-line.src-mine .rtt-value {
+  color: var(--src-mine);
 }
 .rtt-unit {
   color: var(--muted);
   font-size: 11px;
-  margin-left: 2px;
 }
 .rtt-bar {
   position: absolute;
@@ -783,7 +814,7 @@ button {
   bottom: 0;
   height: 2px;
   border-radius: 2px;
-  background: linear-gradient(90deg, rgba(56, 189, 248, 0.2), var(--sub));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--src-estimate) 20%, transparent), var(--src-estimate));
 }
 
 .badge {
@@ -800,6 +831,93 @@ button {
 .badge-proxy {
   color: var(--proxy);
   background: rgba(167, 139, 250, 0.12);
+}
+.badge.src-atlas {
+  color: var(--src-atlas);
+  background: color-mix(in srgb, var(--src-atlas) 12%, transparent);
+}
+
+/* 三类数据来源：统一的颜色（--src）、图例、说明条 */
+
+.src-estimate {
+  --src: var(--src-estimate);
+}
+.src-mine {
+  --src: var(--src-mine);
+}
+.src-atlas {
+  --src: var(--src-atlas);
+}
+.src-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--src);
+  flex: none;
+}
+.source-legend {
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+.source-legend ul {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.source-legend li {
+  display: grid;
+  grid-template-columns: 8px auto 1fr;
+  align-items: baseline;
+  gap: 6px;
+}
+.source-legend li b {
+  color: var(--src);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.source-legend p {
+  margin: 0;
+}
+.source-banner {
+  border: 1px solid color-mix(in srgb, var(--src) 40%, transparent);
+  border-left: 3px solid var(--src);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--src) 8%, transparent);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+.source-banner b {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--src);
+}
+.source-banner p {
+  margin: 0;
+  font-size: 12.5px;
+}
+.sort-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--raised);
+}
+.sort-toggle button {
+  border: none;
+  background: none;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.sort-toggle .sort-on {
+  background: color-mix(in srgb, var(--src) 16%, transparent);
+  color: var(--src);
+  font-weight: 600;
 }
 
 /* 目标数据中心 + tabs */
@@ -842,14 +960,31 @@ button {
   color: var(--text);
   font-weight: 600;
 }
-.tab-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--live);
-  margin-left: 6px;
-  vertical-align: middle;
+.source-tabs button {
+  display: grid;
+  gap: 1px;
+  justify-items: center;
+  border-top: 2px solid transparent;
+}
+.source-tabs .tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.source-tabs .tab-value {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-weight: 400;
+}
+.source-tabs .tab-on {
+  background: color-mix(in srgb, var(--src) 14%, transparent);
+  border-top-color: var(--src);
+}
+.source-tabs .tab-on .tab-value {
+  color: var(--src);
+  font-weight: 600;
 }
 
 .summary-grid {

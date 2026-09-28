@@ -5,8 +5,8 @@
   "en": "Initial reachability check (not RIPE Atlas): on 2026-09-28, DNS, ICMP ping and TCP 443 were tested from a machine in Jersey City, New Jersey; only targets whose minimum RTT is not below the straight-line fiber floor are kept, which rules out anycast/edge addresses."
  },
  "notes": [
-  "GCP 没有收录：区域服务都挂在 Google 前端的 anycast 地址上，ping/traceroute 只会到最近的 Google 边缘，要测具体区域需在该区域开一台 VM。",
-  "AWS 与 Azure 不响应 ICMP，请用 TCP traceroute（端口 443）；最后一跳的 RTT 就是到区域入口的时延。",
+  "GCP 用各区域的 Pub/Sub 区域端点（pubsub.<区域>.rep.googleapis.com）：Google 文档说明区域端点的流量在该区域内处理并终止 TLS；2026-09-28 从新泽西实测 TCP 443 的 RTT 与区域距离一致（us-east4 约 14 ms，asia-northeast1 约 170 ms），不是最近边缘节点。它们对 ICMP 的应答慢且不稳定，请用 TCP 443。普通的 *.googleapis.com 和 Cloud Run 地址是 anycast，只会到最近的边缘。",
+  "AWS、Azure 与 GCP 的目标不响应（或不可靠地响应）ICMP，请用 TCP traceroute（端口 443）；最后一跳的 RTT 就是到区域入口的时延。",
   "Azure 目标是 azurespeed 项目自己的存储账户，只用于少量测量，别做高频探测。",
   "目标地址会变，发起测量时用域名（RIPE Atlas 会在探针端解析），不要写死 IP。"
  ],
@@ -115,7 +115,7 @@
    },
    "localCheck": {
     "icmpMs": null,
-    "tcpMs": 180.0,
+    "tcpMs": 180,
     "floorMs": 108.7
    }
   },
@@ -152,7 +152,7 @@
    "localCheck": {
     "icmpMs": null,
     "tcpMs": 261.1,
-    "floorMs": 127.0
+    "floorMs": 127
    }
   },
   {
@@ -260,7 +260,7 @@
    "localCheck": {
     "icmpMs": null,
     "tcpMs": 238.7,
-    "floorMs": 139.0
+    "floorMs": 139
    }
   },
   {
@@ -295,7 +295,7 @@
    },
    "localCheck": {
     "icmpMs": null,
-    "tcpMs": 18.0,
+    "tcpMs": 18,
     "floorMs": 5.2
    }
   },
@@ -386,7 +386,7 @@
    "localCheck": {
     "icmpMs": null,
     "tcpMs": 101.7,
-    "floorMs": 62.0
+    "floorMs": 62
    }
   },
   {
@@ -403,7 +403,7 @@
    },
    "localCheck": {
     "icmpMs": null,
-    "tcpMs": 100.0,
+    "tcpMs": 100,
     "floorMs": 61.9
    }
   },
@@ -637,7 +637,7 @@
    },
    "localCheck": {
     "icmpMs": null,
-    "tcpMs": 78.0,
+    "tcpMs": 78,
     "floorMs": 35.7
    }
   },
@@ -673,7 +673,7 @@
    },
    "localCheck": {
     "icmpMs": null,
-    "tcpMs": 71.0,
+    "tcpMs": 71,
     "floorMs": 38.4
    }
   },
@@ -817,8 +817,8 @@
    },
    "localCheck": {
     "icmpMs": null,
-    "tcpMs": 26.0,
-    "floorMs": 7.0
+    "tcpMs": 26,
+    "floorMs": 7
    }
   },
   {
@@ -854,7 +854,7 @@
    "localCheck": {
     "icmpMs": null,
     "tcpMs": 34.2,
-    "floorMs": 16.0
+    "floorMs": 16
    }
   },
   {
@@ -1051,7 +1051,7 @@
    },
    "localCheck": {
     "icmpMs": null,
-    "tcpMs": 166.0,
+    "tcpMs": 166,
     "floorMs": 106.2
    }
   },
@@ -1160,7 +1160,7 @@
    "localCheck": {
     "icmpMs": null,
     "tcpMs": 187.3,
-    "floorMs": 139.0
+    "floorMs": 139
    }
   },
   {
@@ -1214,7 +1214,7 @@
    "localCheck": {
     "icmpMs": null,
     "tcpMs": 95.1,
-    "floorMs": 58.0
+    "floorMs": 58
    }
   },
   {
@@ -1322,7 +1322,7 @@
    "localCheck": {
     "icmpMs": null,
     "tcpMs": 203.3,
-    "floorMs": 132.0
+    "floorMs": 132
    }
   },
   {
@@ -1376,7 +1376,7 @@
    "localCheck": {
     "icmpMs": null,
     "tcpMs": 95.4,
-    "floorMs": 62.0
+    "floorMs": 62
    }
   },
   {
@@ -1520,7 +1520,7 @@
    "localCheck": {
     "icmpMs": null,
     "tcpMs": 72.2,
-    "floorMs": 36.0
+    "floorMs": 36
    }
   },
   {
@@ -1539,6 +1539,780 @@
     "icmpMs": null,
     "tcpMs": 67.1,
     "floorMs": 33.7
+   }
+  },
+  {
+   "region": "gcp:africa-south1",
+   "provider": "gcp",
+   "city": "Johannesburg",
+   "host": "pubsub.africa-south1.rep.googleapis.com",
+   "ip": "34.1.116.249",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 223.7,
+    "floorMs": 125.9
+   }
+  },
+  {
+   "region": "gcp:asia-east1",
+   "provider": "gcp",
+   "city": "Changhua County",
+   "host": "pubsub.asia-east1.rep.googleapis.com",
+   "ip": "34.1.83.208",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 196.1,
+    "floorMs": 124.1
+   }
+  },
+  {
+   "region": "gcp:asia-east2",
+   "provider": "gcp",
+   "city": "Hong Kong",
+   "host": "pubsub.asia-east2.rep.googleapis.com",
+   "ip": "34.190.6.84",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 210.8,
+    "floorMs": 127
+   }
+  },
+  {
+   "region": "gcp:asia-northeast1",
+   "provider": "gcp",
+   "city": "Tokyo",
+   "host": "pubsub.asia-northeast1.rep.googleapis.com",
+   "ip": "34.190.12.12",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 170.8,
+    "floorMs": 106.4
+   }
+  },
+  {
+   "region": "gcp:asia-northeast2",
+   "provider": "gcp",
+   "city": "Osaka",
+   "host": "pubsub.asia-northeast2.rep.googleapis.com",
+   "ip": "34.190.22.131",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 177.7,
+    "floorMs": 108.8
+   }
+  },
+  {
+   "region": "gcp:asia-northeast3",
+   "provider": "gcp",
+   "city": "Seoul",
+   "host": "pubsub.asia-northeast3.rep.googleapis.com",
+   "ip": "34.190.26.161",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 198.5,
+    "floorMs": 108.3
+   }
+  },
+  {
+   "region": "gcp:asia-south1",
+   "provider": "gcp",
+   "city": "Mumbai",
+   "host": "pubsub.asia-south1.rep.googleapis.com",
+   "ip": "34.1.80.25",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 250.5,
+    "floorMs": 122.9
+   }
+  },
+  {
+   "region": "gcp:asia-south2",
+   "provider": "gcp",
+   "city": "Delhi",
+   "host": "pubsub.asia-south2.rep.googleapis.com",
+   "ip": "34.1.77.103",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 293.6,
+    "floorMs": 115.1
+   }
+  },
+  {
+   "region": "gcp:asia-southeast1",
+   "provider": "gcp",
+   "city": "Singapore",
+   "host": "pubsub.asia-southeast1.rep.googleapis.com",
+   "ip": "34.190.53.47",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 233.7,
+    "floorMs": 150.3
+   }
+  },
+  {
+   "region": "gcp:asia-southeast2",
+   "provider": "gcp",
+   "city": "Jakarta",
+   "host": "pubsub.asia-southeast2.rep.googleapis.com",
+   "ip": "34.190.59.183",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 247.5,
+    "floorMs": 158.6
+   }
+  },
+  {
+   "region": "gcp:asia-southeast3",
+   "provider": "gcp",
+   "city": "Bangkok",
+   "host": "pubsub.asia-southeast3.rep.googleapis.com",
+   "ip": "34.191.108.107",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 261.9,
+    "floorMs": 136.6
+   }
+  },
+  {
+   "region": "gcp:australia-southeast1",
+   "provider": "gcp",
+   "city": "Sydney",
+   "host": "pubsub.australia-southeast1.rep.googleapis.com",
+   "ip": "34.190.65.14",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 266.6,
+    "floorMs": 156.7
+   }
+  },
+  {
+   "region": "gcp:australia-southeast2",
+   "provider": "gcp",
+   "city": "Melbourne",
+   "host": "pubsub.australia-southeast2.rep.googleapis.com",
+   "ip": "34.190.73.16",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 280.8,
+    "floorMs": 163.4
+   }
+  },
+  {
+   "region": "gcp:europe-central2",
+   "provider": "gcp",
+   "city": "Warsaw",
+   "host": "pubsub.europe-central2.rep.googleapis.com",
+   "ip": "34.190.85.189",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 105.9,
+    "floorMs": 67.2
+   }
+  },
+  {
+   "region": "gcp:europe-north1",
+   "provider": "gcp",
+   "city": "Hamina",
+   "host": "pubsub.europe-north1.rep.googleapis.com",
+   "ip": "34.190.88.210",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 112.9,
+    "floorMs": 65.7
+   }
+  },
+  {
+   "region": "gcp:europe-north2",
+   "provider": "gcp",
+   "city": "Stockholm",
+   "host": "pubsub.europe-north2.rep.googleapis.com",
+   "ip": "34.1.103.36",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 111.5,
+    "floorMs": 62
+   }
+  },
+  {
+   "region": "gcp:europe-southwest1",
+   "provider": "gcp",
+   "city": "Madrid",
+   "host": "pubsub.europe-southwest1.rep.googleapis.com",
+   "ip": "34.190.107.88",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 99.7,
+    "floorMs": 56.6
+   }
+  },
+  {
+   "region": "gcp:europe-west1",
+   "provider": "gcp",
+   "city": "St. Ghislain",
+   "host": "pubsub.europe-west1.rep.googleapis.com",
+   "ip": "34.1.92.212",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 94.8,
+    "floorMs": 57.6
+   }
+  },
+  {
+   "region": "gcp:europe-west10",
+   "provider": "gcp",
+   "city": "Berlin",
+   "host": "pubsub.europe-west10.rep.googleapis.com",
+   "ip": "34.190.120.223",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 101.8,
+    "floorMs": 62.6
+   }
+  },
+  {
+   "region": "gcp:europe-west12",
+   "provider": "gcp",
+   "city": "Turin",
+   "host": "pubsub.europe-west12.rep.googleapis.com",
+   "ip": "34.190.133.241",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 98.1,
+    "floorMs": 62.6
+   }
+  },
+  {
+   "region": "gcp:europe-west2",
+   "provider": "gcp",
+   "city": "London",
+   "host": "pubsub.europe-west2.rep.googleapis.com",
+   "ip": "34.190.142.206",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 81.9,
+    "floorMs": 54.6
+   }
+  },
+  {
+   "region": "gcp:europe-west3",
+   "provider": "gcp",
+   "city": "Frankfurt",
+   "host": "pubsub.europe-west3.rep.googleapis.com",
+   "ip": "34.1.66.146",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 92.7,
+    "floorMs": 60.8
+   }
+  },
+  {
+   "region": "gcp:europe-west4",
+   "provider": "gcp",
+   "city": "Eemshaven",
+   "host": "pubsub.europe-west4.rep.googleapis.com",
+   "ip": "34.190.157.122",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 88.8,
+    "floorMs": 58.3
+   }
+  },
+  {
+   "region": "gcp:europe-west6",
+   "provider": "gcp",
+   "city": "Zurich",
+   "host": "pubsub.europe-west6.rep.googleapis.com",
+   "ip": "34.190.164.31",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 97.5,
+    "floorMs": 62
+   }
+  },
+  {
+   "region": "gcp:europe-west8",
+   "provider": "gcp",
+   "city": "Milan",
+   "host": "pubsub.europe-west8.rep.googleapis.com",
+   "ip": "34.1.76.171",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 98,
+    "floorMs": 63.4
+   }
+  },
+  {
+   "region": "gcp:europe-west9",
+   "provider": "gcp",
+   "city": "Paris",
+   "host": "pubsub.europe-west9.rep.googleapis.com",
+   "ip": "34.1.65.76",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 87.8,
+    "floorMs": 57.2
+   }
+  },
+  {
+   "region": "gcp:me-central1",
+   "provider": "gcp",
+   "city": "Doha",
+   "host": "pubsub.me-central1.rep.googleapis.com",
+   "ip": "34.190.188.144",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 187.1,
+    "floorMs": 105.6
+   }
+  },
+  {
+   "region": "gcp:me-central2",
+   "provider": "gcp",
+   "city": "Dammam",
+   "host": "pubsub.me-central2.rep.googleapis.com",
+   "ip": "34.1.64.36",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 185.7,
+    "floorMs": 103.8
+   }
+  },
+  {
+   "region": "gcp:me-west1",
+   "provider": "gcp",
+   "city": "Tel Aviv",
+   "host": "pubsub.me-west1.rep.googleapis.com",
+   "ip": "34.190.200.41",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 133.8,
+    "floorMs": 89.4
+   }
+  },
+  {
+   "region": "gcp:northamerica-northeast1",
+   "provider": "gcp",
+   "city": "Montréal",
+   "host": "pubsub.northamerica-northeast1.rep.googleapis.com",
+   "ip": "34.190.211.74",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 17.3,
+    "floorMs": 5.2
+   }
+  },
+  {
+   "region": "gcp:northamerica-northeast2",
+   "provider": "gcp",
+   "city": "Toronto",
+   "host": "pubsub.northamerica-northeast2.rep.googleapis.com",
+   "ip": "34.190.216.191",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 21.2,
+    "floorMs": 5.4
+   }
+  },
+  {
+   "region": "gcp:northamerica-south1",
+   "provider": "gcp",
+   "city": "Querétaro",
+   "host": "pubsub.northamerica-south1.rep.googleapis.com",
+   "ip": "34.190.224.92",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 71.5,
+    "floorMs": 32.8
+   }
+  },
+  {
+   "region": "gcp:southamerica-east1",
+   "provider": "gcp",
+   "city": "São Paulo",
+   "host": "pubsub.southamerica-east1.rep.googleapis.com",
+   "ip": "34.190.236.217",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 134.7,
+    "floorMs": 75.4
+   }
+  },
+  {
+   "region": "gcp:southamerica-west1",
+   "provider": "gcp",
+   "city": "Santiago",
+   "host": "pubsub.southamerica-west1.rep.googleapis.com",
+   "ip": "34.190.240.163",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 156,
+    "floorMs": 80.9
+   }
+  },
+  {
+   "region": "gcp:us-central1",
+   "provider": "gcp",
+   "city": "Council Bluffs",
+   "host": "pubsub.us-central1.rep.googleapis.com",
+   "ip": "34.1.71.58",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 31.5,
+    "floorMs": 17.9
+   }
+  },
+  {
+   "region": "gcp:us-east1",
+   "provider": "gcp",
+   "city": "Moncks Corner",
+   "host": "pubsub.us-east1.rep.googleapis.com",
+   "ip": "34.1.72.225",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 26.4,
+    "floorMs": 9.7
+   }
+  },
+  {
+   "region": "gcp:us-east4",
+   "provider": "gcp",
+   "city": "Ashburn",
+   "host": "pubsub.us-east4.rep.googleapis.com",
+   "ip": "34.1.73.140",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 15.1,
+    "floorMs": 3.4
+   }
+  },
+  {
+   "region": "gcp:us-east5",
+   "provider": "gcp",
+   "city": "Columbus",
+   "host": "pubsub.us-east5.rep.googleapis.com",
+   "ip": "34.1.74.221",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 22.9,
+    "floorMs": 7.5
+   }
+  },
+  {
+   "region": "gcp:us-south1",
+   "provider": "gcp",
+   "city": "Dallas",
+   "host": "pubsub.us-south1.rep.googleapis.com",
+   "ip": "34.1.75.117",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 44.8,
+    "floorMs": 21.6
+   }
+  },
+  {
+   "region": "gcp:us-west1",
+   "provider": "gcp",
+   "city": "The Dalles",
+   "host": "pubsub.us-west1.rep.googleapis.com",
+   "ip": "34.1.67.185",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 74.4,
+    "floorMs": 37.3
+   }
+  },
+  {
+   "region": "gcp:us-west2",
+   "provider": "gcp",
+   "city": "Los Angeles",
+   "host": "pubsub.us-west2.rep.googleapis.com",
+   "ip": "34.1.68.60",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 63.6,
+    "floorMs": 38.6
+   }
+  },
+  {
+   "region": "gcp:us-west3",
+   "provider": "gcp",
+   "city": "Salt Lake City",
+   "host": "pubsub.us-west3.rep.googleapis.com",
+   "ip": "34.1.69.15",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 88.6,
+    "floorMs": 31
+   }
+  },
+  {
+   "region": "gcp:us-west4",
+   "provider": "gcp",
+   "city": "Las Vegas",
+   "host": "pubsub.us-west4.rep.googleapis.com",
+   "ip": "34.1.70.183",
+   "method": "tcp443",
+   "source": {
+    "zh": "Google Cloud Pub/Sub 区域 API 端点（REP，流量在该区域内处理并终止 TLS）",
+    "en": "Google Cloud Pub/Sub regional API endpoint (REP; traffic is processed and TLS terminated inside the region)",
+    "url": "https://docs.cloud.google.com/pubsub/docs/reference/service_apis_overview"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 69.3,
+    "floorMs": 35.1
    }
   },
   {
@@ -1627,7 +2401,7 @@
    },
    "localCheck": {
     "icmpMs": 224.4,
-    "tcpMs": 228.0,
+    "tcpMs": 228,
     "floorMs": 126.1
    }
   },
@@ -1644,7 +2418,7 @@
     "url": "https://www.tencentcloud.com/document/product/436/6224"
    },
    "localCheck": {
-    "icmpMs": 233.0,
+    "icmpMs": 233,
     "tcpMs": 232.7,
     "floorMs": 126.9
    }
@@ -1682,7 +2456,7 @@
    "localCheck": {
     "icmpMs": 238.5,
     "tcpMs": 238.6,
-    "floorMs": 150.0
+    "floorMs": 150
    }
   },
   {
@@ -1735,7 +2509,7 @@
    },
    "localCheck": {
     "icmpMs": 197.9,
-    "tcpMs": 195.0,
+    "tcpMs": 195,
     "floorMs": 108.2
    }
   },
@@ -1753,7 +2527,7 @@
    },
    "localCheck": {
     "icmpMs": 215.6,
-    "tcpMs": 301.0,
+    "tcpMs": 301,
     "floorMs": 116.1
    }
   },
@@ -1771,7 +2545,7 @@
    },
    "localCheck": {
     "icmpMs": 247.5,
-    "tcpMs": 236.0,
+    "tcpMs": 236,
     "floorMs": 150.2
    }
   },
@@ -1844,7 +2618,7 @@
    "localCheck": {
     "icmpMs": 161.2,
     "tcpMs": 161.4,
-    "floorMs": 103.0
+    "floorMs": 103
    }
   },
   {
@@ -1914,8 +2688,8 @@
     "url": "https://www.tencentcloud.com/document/product/436/6224"
    },
    "localCheck": {
-    "icmpMs": 130.0,
-    "tcpMs": 130.0,
+    "icmpMs": 130,
+    "tcpMs": 130,
     "floorMs": 75.3
    }
   }

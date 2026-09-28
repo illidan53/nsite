@@ -32,11 +32,13 @@ export default function Section({ title, aside, storageKey, defaultOpen, childre
   };
   return (
     <section className={`section ${open ? 'section-open' : ''}`}>
-      <button className="section-head" aria-expanded={open} aria-controls={id} onClick={toggle}>
-        <span className="section-chevron" aria-hidden="true" />
-        <span className="section-title">{title}</span>
+      <div className="section-head">
+        <button className="section-toggle" aria-expanded={open} aria-controls={id} onClick={toggle}>
+          <span className="section-chevron" aria-hidden="true" />
+          <span className="section-title">{title}</span>
+        </button>
         {aside && <span className="section-aside">{aside}</span>}
-      </button>
+      </div>
       <div id={id} className="section-body" hidden={!open}>
         {children}
       </div>

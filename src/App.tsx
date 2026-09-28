@@ -5,6 +5,7 @@ import TargetsPanel from './components/TargetsPanel.tsx';
 import type { RankedRegion } from './components/RegionList.tsx';
 import { whoami } from './lib/api.ts';
 import { loadAppData, type AppData } from './lib/data.ts';
+import { bestRtt, loadMeasured, measuredOriginFor } from './lib/measured.ts';
 import { haversineKm, interpolateGreatCircle } from './lib/geo.ts';
 import { useI18n, type Lang } from './lib/i18n.tsx';
 import { providerName } from './lib/names.ts';
@@ -12,7 +13,7 @@ import { lookupCountry, lookupPlace, type Place } from './lib/places.ts';
 import { PROVIDERS } from './lib/providers.ts';
 import { estimateRtt, routeTo, shortestFrom } from './lib/routing.ts';
 import { THEMES, THEME_IDS, initialTheme, saveTheme, type ThemeId } from './lib/themes.ts';
-import type { ProviderId, Region, TargetsData } from './lib/types.ts';
+import type { MeasuredData, ProviderId, Region, TargetsData } from './lib/types.ts';
 import { useWindowSize } from './lib/useWindowSize.ts';
 import { fetchViewerLocation, viewerLabel, type ViewerLocation } from './lib/viewer.ts';
 
@@ -46,6 +47,7 @@ export default function App() {
   const [ipsOpen, setIpsOpen] = useState(false);
   const [ipSel, setIpSel] = useState<string | null>(null);
   const [owner, setOwner] = useState(false);
+  const [measured, setMeasured] = useState<MeasuredData | null>(null);
   const { w, h } = useWindowSize();
   const pickSeq = useRef(0);
   const theme = THEMES[themeId];
@@ -53,6 +55,7 @@ export default function App() {
   useEffect(() => {
     loadAppData().then(setData, (err: Error) => setLoadError(err.message));
     whoami().then((w) => setOwner(Boolean(w?.owner)));
+    loadMeasured().then(setMeasured);
   }, []);
 
   useEffect(() => {
@@ -70,7 +73,10 @@ export default function App() {
     [ipsData, regionById],
   );
 
-  /** 全部数据中心（不受左上角厂商筛选影响），按估算 RTT 排序。 */
+  /** 点击位置对应的批量站长实测起点地区。 */
+  const measuredOrigin = useMemo(() => measuredOriginFor(measured, place, origin), [measured, place, origin]);
+
+  /** 全部数据中心（不受左上角厂商筛选影响），按估算 RTT 排序；有站长实测时一并带上（两者分开存放，不混算）。 */
   const rankedAll = useMemo<RankedRegion[]>(() => {
     if (!data || !origin) return [];
     return data.network.regions
@@ -78,9 +84,10 @@ export default function App() {
         region,
         distanceKm: haversineKm(origin.lat, origin.lng, region.lat, region.lng),
         rttMs: estimateRtt(data.graph, sp, region, origin.lat, origin.lng),
+        mineMs: bestRtt(measuredOrigin?.cell.regions[region.id]),
       }))
       .sort((a, b) => a.rttMs - b.rttMs);
-  }, [data, origin, sp]);
+  }, [data, origin, sp, measuredOrigin]);
   const nearby = useMemo(() => rankedAll.filter((r) => enabled.has(r.region.provider)), [rankedAll, enabled]);
 
   const route = useMemo(() => (data && sp && target ? routeTo(data.graph, sp, target) : null), [data, sp, target]);
@@ -274,6 +281,7 @@ export default function App() {
         route={!ipsOpen && tab === 'estimate' ? route : null}
         activeRange={activeRange}
         trace={!ipsOpen && tab !== 'estimate' ? overlay : null}
+        traceSource={tab === 'atlas' ? 'atlas' : 'mine'}
         target={ipsOpen ? (ipSel ? regionById.get(ipSel) ?? null : null) : target}
         camera={camera}
         offset={offset}
@@ -361,6 +369,8 @@ export default function App() {
         place={place}
         onLand={onLand}
         nearby={nearby}
+        measuredData={measured}
+        measuredOrigin={measuredOrigin}
         all={rankedAll}
         target={target}
         tab={tab}

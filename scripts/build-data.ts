@@ -1,7 +1,7 @@
 // 下载并预处理站点所需的全部静态数据，输出到 public/data/。
 // 运行：npm run data（原始下载缓存在 .data-cache/，删除该目录即可强制刷新）。
 
-import { copyFile, mkdir, readFile, writeFile, stat } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, rm, writeFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Feature, FeatureCollection, Geometry, Point, Polygon, MultiPolygon, Position } from 'geojson';
@@ -569,7 +569,18 @@ async function main() {
     .map((t) => ({ ...t, lat: regionById.get(t.region)!.lat, lng: regionById.get(t.region)!.lng }));
   await writeFile(path.join(OUT, 'targets.json'), JSON.stringify(targets));
   log(`公开测试目标 ${targets.targets.length} 个`);
-  for (const f of ['network.json', 'targets.json', 'countries.topo.json', 'admin1.topo.json', 'landmask.bin', 'koppen.bin']) {
+
+  // 批量站长实测结果（scripts/batch-measure.ts collect 生成并入库）；还没跑过时前端只显示模型估算。
+  const measured = path.join(ROOT, 'docs', 'measured.json');
+  const outputs = ['network.json', 'targets.json', 'countries.topo.json', 'admin1.topo.json', 'landmask.bin', 'koppen.bin'];
+  try {
+    await copyFile(measured, path.join(OUT, 'measured.json'));
+    outputs.push('measured.json');
+  } catch {
+    await rm(path.join(OUT, 'measured.json'), { force: true });
+    log('没有 docs/measured.json（还没跑过批量站长实测）');
+  }
+  for (const f of outputs) {
     const s = await stat(path.join(OUT, f));
     log(`  ${f}: ${(s.size / 1024).toFixed(0)} KB`);
   }

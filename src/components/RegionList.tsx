@@ -7,7 +7,10 @@ import type { ProviderId, Region } from '../lib/types.ts';
 export interface RankedRegion {
   region: Region;
   distanceKm: number;
+  /** 模型估算 RTT。 */
   rttMs: number;
+  /** 站长实测（批量）里到达该区域的最低 RTT；没有测过或没到达时为 null。 */
+  mineMs: number | null;
 }
 
 export function fmtMs(ms: number) {
@@ -20,7 +23,7 @@ export function fmtKm(km: number) {
 
 function RegionRow({ item, max, onSelect }: { item: RankedRegion; max: number; onSelect: (r: Region) => void }) {
   const { lang, t } = useI18n();
-  const { region, distanceKm, rttMs } = item;
+  const { region, distanceKm, rttMs, mineMs } = item;
   const p = PROVIDER_BY_ID[region.provider];
   const same = region.anchors.some((a) => a.sameProvider);
   return (
@@ -33,7 +36,7 @@ function RegionRow({ item, max, onSelect }: { item: RankedRegion; max: number; o
               <b style={{ color: p.color }}>{providerName(p, lang)}</b> {regionName(region, lang)}
             </span>
             {region.anchors.length > 0 && (
-              <span className={`badge ${same ? 'badge-live' : 'badge-proxy'}`} title={t(same ? 'badge.liveTitle' : 'badge.proxyTitle')}>
+              <span className="badge src-atlas" title={t(same ? 'badge.liveTitle' : 'badge.proxyTitle')}>
                 {t(same ? 'badge.live' : 'badge.proxy')}
               </span>
             )}
@@ -43,8 +46,18 @@ function RegionRow({ item, max, onSelect }: { item: RankedRegion; max: number; o
           </span>
         </span>
         <span className="region-rtt">
-          <span className="rtt-value">{fmtMs(rttMs)}</span>
-          <span className="rtt-unit">ms</span>
+          <span className="rtt-line src-estimate" title={t('tab.estimate')}>
+            <span className="rtt-tag">{t('src.estimate.short')}</span>
+            <span className="rtt-value">{fmtMs(rttMs)}</span>
+            <span className="rtt-unit">ms</span>
+          </span>
+          {mineMs !== null && (
+            <span className="rtt-line src-mine" title={t('tab.mine')}>
+              <span className="rtt-tag">{t('src.mine.short')}</span>
+              <span className="rtt-value">{fmtMs(mineMs)}</span>
+              <span className="rtt-unit">ms</span>
+            </span>
+          )}
           <span className="rtt-bar" style={{ width: `${Math.max(6, (rttMs / max) * 100)}%` }} />
         </span>
       </button>
@@ -56,7 +69,7 @@ function RegionRow({ item, max, onSelect }: { item: RankedRegion; max: number; o
 const FIRST = 5;
 const MORE = 10;
 
-/** 按估算 RTT 排好序的附近数据中心，分页展开。 */
+/** 排好序的附近数据中心，分页展开。 */
 export function RegionList({ items, onSelect }: { items: RankedRegion[]; onSelect: (r: Region) => void }) {
   const { t } = useI18n();
   const [limit, setLimit] = useState(FIRST);

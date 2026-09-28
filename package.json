@@ -9,7 +9,8 @@
     "preview": "vite preview --host 127.0.0.1",
     "data": "node scripts/build-data.ts",
     "test": "vitest run",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "measure": "node scripts/batch-measure.ts"
   },
   "dependencies": {
     "@photostructure/tz-lookup": "^11.7.0",

@@ -125,3 +125,37 @@ export interface TargetsData {
   notes: string[];
   targets: TestTarget[];
 }
+
+// ---------------------------------------------------------------- 批量站长实测（docs/measured.json，由 scripts/batch-measure.ts collect 生成）
+
+/** 一个探针到一个区域的结果：rtt 是目标（该区域公开地址）应答的最小 RTT，没到达目标时为 null。 */
+export interface MeasuredResult {
+  probe: number;
+  rtt: number | null;
+}
+
+export interface MeasuredPair {
+  /** runs 里的下标。 */
+  run: number;
+  msm: number;
+  target: string;
+  /** 结果时间（Unix 秒）。 */
+  at: number;
+  results: MeasuredResult[];
+}
+
+export interface MeasuredCell {
+  country: string;
+  /** 地区中心（省/州用 Natural Earth 标注点，国家用探针位置的中位数）。 */
+  lat: number;
+  lng: number;
+  regions: Record<string, MeasuredPair>;
+}
+
+export interface MeasuredData {
+  generatedAt: string;
+  runs: { id: string; createdAt: string; measurements: number; results: number; credits: number }[];
+  probes: Record<string, { lat: number; lng: number; asn: number; cc: string }>;
+  /** 键：ISO 3166-2（如 US-NJ）或国家代码（如 DE）。 */
+  cells: Record<string, MeasuredCell>;
+}

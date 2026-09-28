@@ -79,9 +79,10 @@ export async function startMeasurement(payload: {
   return data;
 }
 
-/** 读取一次性测量的结果（RIPE Atlas 公开 API，无需 key）。 */
-export async function measurementResults(msmId: number, signal?: AbortSignal): Promise<TraceResult[]> {
-  const res = await fetch(`https://atlas.ripe.net/api/v2/measurements/${msmId}/results/?format=json`, { signal });
+/** 读取一次性测量的结果（RIPE Atlas 公开 API，无需 key）；批量测量探针很多，只取需要的那几个。 */
+export async function measurementResults(msmId: number, signal?: AbortSignal, probeIds?: number[]): Promise<TraceResult[]> {
+  const only = probeIds?.length ? `&probe_ids=${probeIds.join(',')}` : '';
+  const res = await fetch(`https://atlas.ripe.net/api/v2/measurements/${msmId}/results/?format=json${only}`, { signal });
   if (!res.ok) throw new Error(`${res.status}`);
   return ((await res.json()) as Parameters<typeof parseTraceroute>[0][]).map(parseTraceroute);
 }

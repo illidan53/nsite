@@ -84,7 +84,6 @@ export default function RouteAtlas({ region, origin, anchorProbes, onOverlay }: 
   const lastHop = current ? [...current.trace.hops].reverse().find((h) => h.minRtt !== null) : undefined;
   return (
     <div className="route-atlas">
-      <p className="muted small">{t('atlas.source')}</p>
       <div className="anchor-picker">
         {region.anchors.map((a, i) => (
           <button key={a.id} className={`chip ${i === anchorIdx ? 'chip-on' : ''}`} onClick={() => setAnchorIdx(i)}>

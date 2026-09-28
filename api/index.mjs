@@ -2,7 +2,7 @@
 //
 //   GET  /api/whoami                  当前访问者是否为站长（来源 IP 在白名单内）
 //   GET  /api/measurements?pk=...     某“起点地区 | 数据中心”最近的站长实测（公开可读）
-//   POST /api/measure                 站长专用：用个人 RIPE Atlas 账号，从点击所在国家的探针向该数据中心发起 traceroute
+//   POST /api/measure                 站长专用：用个人 RIPE Atlas 账号，从点击所在国家的探针向该数据中心的公开地址发起 traceroute
 //
 // 环境变量：TABLE、RIPE_ATLAS_KEY、OWNER_IPS（逗号分隔，支持 IPv4 CIDR）、DAILY_LIMIT、SITE_ORIGIN。
 
@@ -40,13 +40,10 @@ async function loadSiteData() {
   return siteData;
 }
 
-/** 测量目标：优先用该区域的公开测试地址；没有（如 GCP）时用同城/同网 RIPE Atlas 锚点代测。 */
+/** 测量目标：只用该区域的公开测试地址。没有公开地址的区域不测，锚点数据另有“锚点参考”一栏，不和站长实测混在一起。 */
 function targetFor(region, targets) {
   const t = targets.get(region.id);
-  if (t) return { host: t.host, protocol: t.method === 'icmp' ? 'ICMP' : 'TCP', kind: 'public' };
-  const a = region.anchors?.[0];
-  if (a) return { host: a.fqdn, protocol: 'ICMP', kind: a.sameProvider ? 'anchor-same' : 'anchor-proxy', anchorKm: a.distanceKm };
-  return null;
+  return t ? { host: t.host, protocol: t.method === 'icmp' ? 'ICMP' : 'TCP', kind: 'public' } : null;
 }
 
 // ---------------------------------------------------------------- RIPE Atlas
@@ -207,7 +204,7 @@ async function measure(event) {
   const region = regions.get(regionId);
   if (!region) return json(404, { error: 'unknown region' });
   const target = targetFor(region, targets);
-  if (!target) return json(422, { error: 'no measurable target for this region' });
+  if (!target) return json(422, { error: 'this region has no public test address' });
 
   const probes = await pickProbes(lat, lng, country);
   if (!probes.length) return json(422, { error: `no connected RIPE Atlas probe in ${country}` });

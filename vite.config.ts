@@ -39,6 +39,6 @@ export default defineConfig({
   build: { assetsInlineLimit: (file: string) => (file.includes('flag-icons') ? false : undefined) },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'scripts/**/*.test.ts'],
   },
 } as Parameters<typeof defineConfig>[0]);

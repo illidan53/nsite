@@ -41,6 +41,8 @@ interface Props {
   /** 高亮的分段区间 [起, 止]（含）。 */
   activeRange: [number, number] | null;
   trace: TraceOverlay | null;
+  /** 路径来自哪类数据：站长实测（绿）或锚点参考（紫），颜色与面板一致。 */
+  traceSource: 'mine' | 'atlas';
   target: Region | null;
   camera: CameraTarget | null;
   offset: [number, number];
@@ -75,7 +77,7 @@ const arcStartLat = (d: object) => (d as Arc).from.lat;
 const arcStartLng = (d: object) => (d as Arc).from.lng;
 const arcEndLat = (d: object) => (d as Arc).to.lat;
 const arcEndLng = (d: object) => (d as Arc).to.lng;
-const arcColor = () => ['#f472b6', '#a78bfa'];
+const ARC_COLORS = { mine: ['#34d399', '#059669'], atlas: ['#c4b5fd', '#7c3aed'] } as const;
 const particlesList = (d: object) => d as object[];
 const isProvince = (d: object) => 'adm0' in ((d as Admin1Feature).properties ?? {});
 const isOutline = (d: object) => 'outline' in d;
@@ -90,7 +92,8 @@ const htmlElement = (d: object) => {
 };
 
 function GlobeView(props: Props) {
-  const { theme, countries, land, cables, showCables, showPlanned, regions, origin, you, autoRotate, route, activeRange, trace, target } = props;
+  const { theme, countries, land, cables, showCables, showPlanned, regions, origin, you, autoRotate, route, activeRange, trace, traceSource, target } =
+    props;
   const { camera, offset, onPick, onRegionClick } = props;
   const { lang, t } = useI18n();
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
@@ -211,7 +214,7 @@ function GlobeView(props: Props) {
         list.push({
           lat: p.lat,
           lng: p.lng,
-          cls: `marker marker-${p.kind}`,
+          cls: `marker marker-${p.kind}${p.kind === 'hop' ? ` marker-hop-${traceSource}` : ''}`,
           html: p.kind === 'hop' ? String(p.hop) : p.kind === 'probe' ? 'P' : '◎',
           title: p.label,
         });
@@ -230,7 +233,7 @@ function GlobeView(props: Props) {
       list.push({ lat: you.lat, lng: you.lng, cls: 'marker marker-you', html: '', title: t('marker.you') });
     }
     return list;
-  }, [trace, route, target, you, origin, lang, t]);
+  }, [trace, traceSource, route, target, you, origin, lang, t]);
   const htmlData = useMemo(() => [...labels, ...markers], [labels, markers]);
 
   const polygonCap = useCallback((d: object) => (isOutline(d) ? 'rgba(0,0,0,0)' : theme.polygonCap), [theme]);
@@ -295,6 +298,7 @@ function GlobeView(props: Props) {
   const pointScale = pov.altitude < 0.25 ? 0.12 : pov.altitude < 0.6 ? 0.3 : pov.altitude < 1.2 ? 0.6 : 1;
   const pointAltitude = useCallback((d: object) => ((d as Region).id === targetId ? 0.08 : 0.025) * pointScale, [targetId, pointScale]);
   const pointRadius = useCallback((d: object) => ((d as Region).id === targetId ? 0.45 : 0.22) * pointScale, [targetId, pointScale]);
+  const arcColor = useCallback(() => [...ARC_COLORS[traceSource]], [traceSource]);
   const handleGlobeClick = useCallback(({ lat, lng }: { lat: number; lng: number }) => onPick(lat, lng), [onPick]);
   // 点到国家多边形、点阵或海缆线上时，globe 不会触发 onGlobeClick，这里同样当作选点。
   const handleObjectClick = useCallback(
