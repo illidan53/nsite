@@ -181,7 +181,7 @@ export default function TraceDetail({ probe, trace, target, onOverlay }: Props) 
           : t('marker.probe', { id: probe.id })
         : s.kind === 'target'
           ? target.label
-          : t('marker.hops', { hops: hopRange(s.hops), city: s.city });
+          : t(s.hops.length > 1 ? 'marker.hops' : 'marker.hop', { hops: hopRange(s.hops), city: s.city });
     onOverlay({
       points: stops.map((s) => ({ lat: s.lat, lng: s.lng, kind: s.kind, hops: s.hops, label: label(s) })),
       legs: legs.flatMap(({ from, to, leg }) => {

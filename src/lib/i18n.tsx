@@ -186,6 +186,7 @@ const zh = {
   'atlas.nearProbe': '探针所在地',
   'marker.probeHops': '探针 #{id} · 第 {hops} 跳',
   'marker.hops': '第 {hops} 跳 · {city}',
+  'marker.hop': '第 {hops} 跳 · {city}',
 };
 
 export type MessageKey = keyof typeof zh;
@@ -372,8 +373,9 @@ const en: Record<MessageKey, string> = {
   'atlas.inferred': 'No location data; RTT is almost the same as hop {hop}, so it is placed in the same city',
   'atlas.inferredProbe': 'No location data (or a private address); RTT is almost the same as at the probe, so it is placed in the probe’s city',
   'atlas.nearProbe': 'probe’s city',
-  'marker.probeHops': 'Probe #{id} · hops {hops}',
+  'marker.probeHops': 'Probe #{id} · hop(s) {hops}',
   'marker.hops': 'Hops {hops} · {city}',
+  'marker.hop': 'Hop {hops} · {city}',
 };
 
 const MESSAGES: Record<Lang, Record<MessageKey, string>> = { zh, en };
