@@ -70,7 +70,12 @@ async function atlas(path, init) {
     body = { raw: text };
   }
   if (!res.ok) {
-    const detail = body?.error?.detail || body?.error?.errors?.map((e) => e.detail).join('; ') || text.slice(0, 300);
+    // RIPE Atlas 的 400 通常是笼统的 detail + 具体的 errors[]，两者都带上。
+    const specific = (body?.error?.errors ?? [])
+      .map((e) => [e.source?.pointer, e.detail].filter(Boolean).join(': '))
+      .filter(Boolean)
+      .join('; ');
+    const detail = [body?.error?.detail, specific].filter(Boolean).join(' — ') || text.slice(0, 300);
     const err = new Error(`RIPE Atlas ${res.status}: ${detail}`);
     err.status = res.status;
     throw err;
@@ -120,6 +125,20 @@ async function pickProbes(lat, lng, country) {
 }
 
 // ---------------------------------------------------------------- 每日额度
+
+async function refundQuota() {
+  const day = new Date().toISOString().slice(0, 10);
+  await ddb
+    .send(
+      new UpdateItemCommand({
+        TableName: TABLE,
+        Key: { pk: { S: `quota#${day}` }, createdAt: { S: day } },
+        UpdateExpression: 'ADD n :minus',
+        ExpressionAttributeValues: { ':minus': { N: '-1' } },
+      }),
+    )
+    .catch((err) => console.error('refund failed', err));
+}
 
 async function takeQuota() {
   const day = new Date().toISOString().slice(0, 10);
@@ -200,16 +219,23 @@ async function measure(event) {
     target: target.host,
     protocol: target.protocol,
     ...(target.protocol === 'TCP' ? { port: 443 } : {}),
-    description: `nsite ${cell} -> ${regionId}`,
+    // RIPE Atlas 的描述只允许有限的字符（不能有 ":"、">" 等）。
+    description: `nsite ${cell} to ${regionId}`.replace(/[^A-Za-z0-9 ._-]/g, ' '),
   };
-  const created = await atlas('/measurements/', {
-    method: 'POST',
-    body: JSON.stringify({
-      definitions: [definition],
-      probes: [{ type: 'probes', value: probes.map((p) => p.id).join(','), requested: probes.length }],
-      is_oneoff: true,
-    }),
-  });
+  let created;
+  try {
+    created = await atlas('/measurements/', {
+      method: 'POST',
+      body: JSON.stringify({
+        definitions: [definition],
+        probes: [{ type: 'probes', value: probes.map((p) => p.id).join(','), requested: probes.length }],
+        is_oneoff: true,
+      }),
+    });
+  } catch (err) {
+    await refundQuota();
+    throw err;
+  }
   const msmId = created.measurements[0];
   const createdAt = new Date().toISOString();
   const origin = { lat, lng, country, cell };
