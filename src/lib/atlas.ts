@@ -114,7 +114,11 @@ export function isPrivateIp(ip: string): boolean {
 }
 
 export function parseTraceroute(r: ApiTraceroute): TraceResult {
+  let prevHop = 0;
   const hops: TraceHop[] = (r.result ?? []).map((h) => {
+    // TCP traceroute 把目标的 SYN-ACK 记作第 255 跳，显示时接在上一跳之后。
+    const hop = h.hop === 255 ? prevHop + 1 : h.hop;
+    prevHop = hop;
     const replies = (h.result ?? []).filter((x) => x.from && typeof x.rtt === 'number');
     // 一跳可能有多个应答地址（负载均衡），取出现最多的那个。
     const counts = new Map<string, number>();
@@ -122,7 +126,7 @@ export function parseTraceroute(r: ApiTraceroute): TraceResult {
     const ip = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
     const rtts = replies.filter((x) => x.from === ip).map((x) => x.rtt!);
     return {
-      hop: h.hop,
+      hop,
       ip,
       rtts,
       minRtt: rtts.length ? Math.min(...rtts) : null,

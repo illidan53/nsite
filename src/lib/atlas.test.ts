@@ -46,3 +46,25 @@ describe('parseTraceroute', () => {
     expect(t2.reached).toBe(false);
   });
 });
+
+describe('parseTraceroute (TCP)', () => {
+  it('renumbers the destination reply recorded as hop 255', () => {
+    const t = parseTraceroute({
+      msm_id: 2,
+      prb_id: 1,
+      timestamp: 0,
+      from: '1.1.1.1',
+      src_addr: '1.1.1.1',
+      dst_addr: '98.87.175.205',
+      destination_ip_responded: true,
+      result: [
+        { hop: 1, result: [{ from: '10.0.0.1', rtt: 1 }] },
+        { hop: 2, result: [{ x: '*' }] },
+        { hop: 255, result: [{ from: '98.87.175.205', rtt: 11 }] },
+      ],
+    });
+    expect(t.hops.map((h) => h.hop)).toEqual([1, 2, 3]);
+    expect(t.hops[2].ip).toBe('98.87.175.205');
+  });
+});
+
