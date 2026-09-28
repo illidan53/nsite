@@ -17,6 +17,8 @@ const DAILY_LIMIT = Number(process.env.DAILY_LIMIT || 50);
 const SITE = process.env.SITE_ORIGIN;
 const ATLAS = 'https://atlas.ripe.net/api/v2';
 const PROBES_PER_MEASUREMENT = 3;
+// 被测云厂商自己网络里的探针代表不了当地用户，不用（与 src/lib/providers.ts 的 ASN 保持一致）。
+const CLOUD_ASNS = new Set([16509, 14618, 8075, 15169, 396982, 19527, 132203, 45090]);
 
 const json = (statusCode, body) => ({
   statusCode,
@@ -92,7 +94,7 @@ async function pickProbes(lat, lng, country) {
     });
     const d = await atlas(`/probes/?${q}`);
     const probes = d.results
-      .filter((p) => p.geometry && p.asn_v4)
+      .filter((p) => p.geometry && p.asn_v4 && !CLOUD_ASNS.has(p.asn_v4))
       .map((p) => ({
         id: p.id,
         lat: p.geometry.coordinates[1],

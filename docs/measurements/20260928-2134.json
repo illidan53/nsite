@@ -1,0 +1,143 @@
+{
+ "id": "20260928-2134",
+ "createdAt": "2026-09-28T21:34:32.037Z",
+ "options": {
+  "nearest": 1,
+  "probes": 1,
+  "split": [],
+  "excludeAsns": [
+   16509,
+   14618,
+   8075,
+   15169,
+   396982,
+   19527,
+   132203,
+   45090
+  ]
+ },
+ "cells": {
+  "IE": {
+   "country": "IE",
+   "lat": 53.3385,
+   "lng": -6.2595
+  },
+  "JP": {
+   "country": "JP",
+   "lat": 35.6795,
+   "lng": 139.6895
+  }
+ },
+ "probes": {
+  "1010815": {
+   "lat": 53.3395,
+   "lng": -6.2525,
+   "asn": 36352,
+   "cc": "IE"
+  },
+  "1016350": {
+   "lat": 35.6875,
+   "lng": 139.6895,
+   "asn": 197196,
+   "cc": "JP"
+  }
+ },
+ "measurements": [
+  {
+   "region": "aws:eu-west-1",
+   "host": "ec2.eu-west-1.amazonaws.com",
+   "protocol": "TCP",
+   "probes": [
+    {
+     "id": 1010815,
+     "cell": "IE"
+    }
+   ],
+   "msm": 216642179
+  },
+  {
+   "region": "azure:northeurope",
+   "host": "s3northeurope.blob.core.windows.net",
+   "protocol": "TCP",
+   "probes": [
+    {
+     "id": 1010815,
+     "cell": "IE"
+    }
+   ],
+   "msm": 216642181
+  },
+  {
+   "region": "gcp:europe-west2",
+   "host": "pubsub.europe-west2.rep.googleapis.com",
+   "protocol": "TCP",
+   "probes": [
+    {
+     "id": 1010815,
+     "cell": "IE"
+    }
+   ],
+   "msm": 216642182
+  },
+  {
+   "region": "tencent:eu-frankfurt",
+   "host": "cos.eu-frankfurt.myqcloud.com",
+   "protocol": "ICMP",
+   "probes": [
+    {
+     "id": 1010815,
+     "cell": "IE"
+    }
+   ],
+   "msm": 216642185
+  },
+  {
+   "region": "aws:ap-northeast-1",
+   "host": "ec2.ap-northeast-1.amazonaws.com",
+   "protocol": "TCP",
+   "probes": [
+    {
+     "id": 1016350,
+     "cell": "JP"
+    }
+   ],
+   "msm": 216642186
+  },
+  {
+   "region": "azure:japaneast",
+   "host": "s3japaneast.blob.core.windows.net",
+   "protocol": "TCP",
+   "probes": [
+    {
+     "id": 1016350,
+     "cell": "JP"
+    }
+   ],
+   "msm": 216642188
+  },
+  {
+   "region": "gcp:asia-northeast1",
+   "host": "pubsub.asia-northeast1.rep.googleapis.com",
+   "protocol": "TCP",
+   "probes": [
+    {
+     "id": 1016350,
+     "cell": "JP"
+    }
+   ],
+   "msm": 216642189
+  },
+  {
+   "region": "tencent:ap-tokyo",
+   "host": "cos.ap-tokyo.myqcloud.com",
+   "protocol": "ICMP",
+   "probes": [
+    {
+     "id": 1016350,
+     "cell": "JP"
+    }
+   ],
+   "msm": 216642190
+  }
+ ]
+}

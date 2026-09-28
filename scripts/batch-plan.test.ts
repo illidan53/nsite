@@ -24,6 +24,10 @@ describe('chooseProbes', () => {
     expect(chooseProbes(cell, 2).map((p) => p.id)).toEqual([1, 3]);
   });
 
+  it('skips probes inside excluded networks', () => {
+    expect(chooseProbes(cell, 2, [701]).map((p) => p.id)).toEqual([3, 4]);
+  });
+
   it('fills with same-ASN probes when there are too few networks', () => {
     expect(chooseProbes({ ...cell, probes: cell.probes.slice(0, 2) }, 2).map((p) => p.id)).toEqual([1, 2]);
   });

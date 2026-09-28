@@ -35,6 +35,8 @@ export interface PlanOptions {
   nearest: number | 'all';
   /** 每个起点地区用几个探针。 */
   probes: number;
+  /** 不用这些 ASN 里的探针（被测云厂商自己的网络，代表不了当地用户）。 */
+  excludeAsns?: number[];
 }
 
 export interface PlannedMeasurement {
@@ -54,9 +56,9 @@ export function median(xs: number[]): number {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-/** 离地区中心最近的 k 个探针：优先稳定在线的，尽量覆盖不同运营商（ASN）。 */
-export function chooseProbes(cell: BatchCell, k: number): BatchProbe[] {
-  const sorted = [...cell.probes].sort(
+/** 离地区中心最近的 k 个探针：优先稳定在线的，尽量覆盖不同运营商（ASN），跳过 excludeAsns 里的网络。 */
+export function chooseProbes(cell: BatchCell, k: number, excludeAsns: number[] = []): BatchProbe[] {
+  const sorted = cell.probes.filter((p) => !excludeAsns.includes(p.asn)).sort(
     (a, b) => Number(b.stable) - Number(a.stable) || haversineKm(cell.lat, cell.lng, a.lat, a.lng) - haversineKm(cell.lat, cell.lng, b.lat, b.lng),
   );
   const picked: BatchProbe[] = [];
@@ -95,7 +97,7 @@ export function nearestTargets(cell: { lat: number; lng: number }, targets: Batc
 export function plan(cells: BatchCell[], targets: BatchTarget[], opts: PlanOptions): PlannedMeasurement[] {
   const byRegion = new Map<string, PlannedMeasurement>();
   for (const cell of cells) {
-    const probes = chooseProbes(cell, opts.probes);
+    const probes = chooseProbes(cell, opts.probes, opts.excludeAsns);
     if (!probes.length) continue;
     for (const target of nearestTargets(cell, targets, opts.nearest)) {
       const m = byRegion.get(target.region) ?? { target, probes: [] };

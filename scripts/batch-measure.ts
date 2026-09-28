@@ -8,7 +8,10 @@
 // 选项：--nearest <n|all>  每家厂商离起点最近的 n 个区域（默认 3）
 //       --probes <k>       每个起点地区的探针数（默认 2）
 //       --split <CC,...>   细分到省/州的国家（默认 US,CA,BR,RU,CN,IN,AU；传 none 表示不细分）
+//       --cells <id,...>   只测这些起点地区（如 JP,IE 或 US-NJ），用于补测
 //       --max-credits <n>  计划超过这个积分就不创建（run 必填）
+//
+// 被测云厂商自己网络里的探针（src/lib/providers.ts 里的 ASN）不参与：它们代表不了当地用户。
 //
 // 需要先 npm run data（用 public/data 里的区域、公开地址和省界）。
 
@@ -20,6 +23,7 @@ import { feature } from 'topojson-client';
 import type { Topology } from 'topojson-specification';
 import { parseTraceroute } from '../src/lib/atlas.ts';
 import { haversineKm } from '../src/lib/geo.ts';
+import { PROVIDERS } from '../src/lib/providers.ts';
 import type { MeasuredData, NetworkData, TargetsData } from '../src/lib/types.ts';
 import {
   CREDITS_PER_RESULT,
@@ -62,13 +66,16 @@ function parseArgs(argv: string[]) {
   }
   const nearest = flags.get('nearest') ?? '3';
   const split = flags.get('split');
+  const only = flags.get('cells');
   return {
     command: rest[0] ?? 'plan',
     opts: {
       nearest: nearest === 'all' ? ('all' as const) : Math.max(1, Number(nearest)),
       probes: Math.max(1, Number(flags.get('probes') ?? 2)),
       split: split === undefined ? DEFAULT_SPLIT : split === 'none' ? [] : split.split(',').map((s) => s.trim().toUpperCase()),
+      excludeAsns: PROVIDERS.flatMap((p) => p.asns),
     },
+    cells: only ? only.split(',').map((s) => s.trim().toUpperCase()) : null,
     maxCredits: flags.has('max-credits') ? Number(flags.get('max-credits')) : null,
     resume: flags.get('resume') ?? null,
     yes: flags.has('yes'),
@@ -173,7 +180,7 @@ async function buildCells(probes: BatchProbe[], split: string[]): Promise<BatchC
 
 const fmt = (n: number) => n.toLocaleString('en-US');
 
-function printTiers(cellsBySplit: Map<string, BatchCell[]>, targets: BatchTarget[]) {
+function printTiers(cellsBySplit: Map<string, BatchCell[]>, targets: BatchTarget[], excludeAsns: number[]) {
   const tiers: { label: string; nearest: number | 'all'; probes: number; split: boolean }[] = [
     { label: '每家最近 1 个 · 1 探针 · 只按国家', nearest: 1, probes: 1, split: false },
     { label: '每家最近 2 个 · 2 探针 · 大国分省', nearest: 2, probes: 2, split: true },
@@ -185,7 +192,7 @@ function printTiers(cellsBySplit: Map<string, BatchCell[]>, targets: BatchTarget
   console.log(`\n参考档位（一次性 traceroute，每个结果 ${CREDITS_PER_RESULT} 积分）：`);
   for (const t of tiers) {
     const cells = cellsBySplit.get(t.split ? 'split' : 'none')!;
-    const c = planCost(plan(cells, targets, { nearest: t.nearest, probes: t.probes }));
+    const c = planCost(plan(cells, targets, { nearest: t.nearest, probes: t.probes, excludeAsns }));
     console.log(`  ${t.label.padEnd(24, '　')}  地区 ${String(cells.length).padStart(4)}  测量 ${String(c.measurements).padStart(4)}  结果 ${fmt(c.results).padStart(7)}  积分 ${fmt(c.credits).padStart(10)}`);
   }
 }
@@ -284,7 +291,10 @@ async function collect() {
   const files = (await readdir(RUNS).catch(() => [])).filter((f) => f.endsWith('.json')).sort();
   if (!files.length) throw new Error('docs/measurements/ 里没有批次文件');
   const out: MeasuredData = { generatedAt: new Date().toISOString(), runs: [], probes: {}, cells: {} };
+  // 早期批次里有少数探针就在被测云厂商的网络里，结果代表不了当地用户，一律不收
+  const cloud = new Set(PROVIDERS.flatMap((p) => p.asns));
   let pending = 0;
+  let skipped = 0;
   for (const f of files) {
     const run = await readJson<RunFile>(path.join(RUNS, f));
     const runIdx = out.runs.length;
@@ -301,6 +311,10 @@ async function collect() {
       for (const p of m.probes) {
         const t = byProbe.get(p.id);
         if (!t) continue;
+        if (cloud.has(run.probes[p.id]?.asn)) {
+          skipped++;
+          continue;
+        }
         const cellInfo = run.cells[p.cell];
         const cell = (out.cells[p.cell] ??= { country: cellInfo.country, lat: cellInfo.lat, lng: cellInfo.lng, regions: {} });
         let pair = cell.regions[m.region];
@@ -318,6 +332,7 @@ async function collect() {
   const pairs = Object.values(out.cells).flatMap((c) => Object.values(c.regions));
   const rs = pairs.flatMap((p) => p.results);
   console.log(`\n写入 docs/measured.json：${Object.keys(out.cells).length} 个地区、${pairs.length} 个地区-区域组合、${rs.length} 个结果，到达目标 ${rs.filter((r) => r.rtt !== null).length} 个`);
+  if (skipped) console.log(`跳过 ${skipped} 个来自被测云厂商网络内探针的结果`);
   if (pending) console.log(`还有 ${pending} 个探针没有返回结果（测量可能还在进行，稍后再 collect 一次）`);
 }
 
@@ -337,7 +352,9 @@ async function main() {
 
   console.log('读取区域和公开地址、拉取在线探针…');
   const [targets, probes] = await Promise.all([loadTargets(), fetchProbes()]);
-  const cells = await buildCells(probes, args.opts.split);
+  const allCells = await buildCells(probes, args.opts.split);
+  const cells = args.cells ? allCells.filter((c) => args.cells!.includes(c.id)) : allCells;
+  if (args.cells && cells.length !== args.cells.length) throw new Error(`找不到起点地区：${args.cells.filter((id) => !cells.some((c) => c.id === id)).join(',')}`);
   const planned = plan(cells, targets, args.opts);
   const cost = planCost(planned);
   console.log(`在线探针 ${fmt(probes.length)} 个，公开地址 ${targets.length} 个区域`);
@@ -348,7 +365,7 @@ async function main() {
 
   if (args.command === 'plan') {
     const other = args.opts.split.length ? await buildCells(probes, []) : await buildCells(probes, DEFAULT_SPLIT);
-    printTiers(new Map([[args.opts.split.length ? 'split' : 'none', cells], [args.opts.split.length ? 'none' : 'split', other]]), targets);
+    printTiers(new Map([[args.opts.split.length ? 'split' : 'none', allCells], [args.opts.split.length ? 'none' : 'split', other]]), targets, args.opts.excludeAsns);
     console.log('\nRIPE Atlas 每个账号每天最多花 1,000,000 积分、产生 100,000 个结果，同时最多 100 个测量。');
     return;
   }
