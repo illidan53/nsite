@@ -4,7 +4,9 @@ import type { Place } from '../lib/places.ts';
 import { PROVIDER_BY_ID } from '../lib/providers.ts';
 import type { EstimatedRoute } from '../lib/routing.ts';
 import type { AnchorProbe, Region, TestTarget } from '../lib/types.ts';
+import Flag from './Flag.tsx';
 import type { TraceOverlay } from './GlobeView.tsx';
+import PlaceInfo from './PlaceInfo.tsx';
 import { RegionList, RegionPicker, type RankedRegion } from './RegionList.tsx';
 import PersonalMeasure from './PersonalMeasure.tsx';
 import RouteAtlas from './RouteAtlas.tsx';
@@ -56,7 +58,10 @@ export default function Panel(props: Props) {
                 {country ? (
                   <>
                     {admin1 && <span>{pick(admin1.name, admin1.nameZh)}</span>}
-                    <span className={admin1 ? 'place-country' : ''}>{pick(country.name, country.nameZh)}</span>
+                    <span className={admin1 ? 'place-country' : ''}>
+                      {pick(country.name, country.nameZh)}
+                      <Flag iso2={country.iso2} title={country.name} />
+                    </span>
                   </>
                 ) : (
                   <span>{t(onLand ? 'place.unknown' : 'place.ocean')}</span>
@@ -124,6 +129,7 @@ export default function Panel(props: Props) {
             </section>
           ) : (
             <div className="panel-body">
+              <PlaceInfo origin={origin} place={place} />
               <Section
                 storageKey="nsite-section-nearby"
                 defaultOpen

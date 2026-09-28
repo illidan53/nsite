@@ -71,13 +71,15 @@ jobs:
         run: |
           aws s3 sync dist/assets "s3://${S3_BUCKET}/assets" \
             --cache-control "public, max-age=31536000, immutable"
-          aws s3 sync dist/data "s3://${S3_BUCKET}/data" --delete --exclude landmask.bin \
+          aws s3 sync dist/data "s3://${S3_BUCKET}/data" --delete --exclude "*.bin" \
             --cache-control "public, max-age=3600"
-          # CloudFront 不压缩 application/octet-stream；陆地位图预先 gzip（810 KB → 约 40 KB）
-          gzip -9 -c dist/data/landmask.bin > "$RUNNER_TEMP/landmask.bin.gz"
-          aws s3 cp "$RUNNER_TEMP/landmask.bin.gz" "s3://${S3_BUCKET}/data/landmask.bin" \
-            --content-type application/octet-stream --content-encoding gzip \
-            --cache-control "public, max-age=3600"
+          # CloudFront 不压缩 application/octet-stream；陆地位图、气候网格等 .bin 预先 gzip（约 1 MB → 40 KB）
+          for f in dist/data/*.bin; do
+            gzip -9 -c "$f" > "$RUNNER_TEMP/$(basename "$f").gz"
+            aws s3 cp "$RUNNER_TEMP/$(basename "$f").gz" "s3://${S3_BUCKET}/data/$(basename "$f")" \
+              --content-type application/octet-stream --content-encoding gzip \
+              --cache-control "public, max-age=3600"
+          done
           aws s3 cp dist/index.html "s3://${S3_BUCKET}/index.html" \
             --content-type "text/html; charset=utf-8" \
             --cache-control "no-cache, max-age=0, must-revalidate"
@@ -91,7 +93,7 @@ jobs:
       - name: Smoke test
         run: |
           curl -fsS "$PUBLIC_URL/" | grep -q "Net Globe"
-          for f in network.json countries.topo.json admin1.topo.json landmask.bin; do
+          for f in network.json countries.topo.json admin1.topo.json landmask.bin koppen.bin; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "$PUBLIC_URL/data/$f")
             echo "$f: $code"
             [ "$code" = "200" ]

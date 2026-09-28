@@ -314,3 +314,43 @@ export async function networksForIps(ips: string[], signal?: AbortSignal): Promi
   });
   return new Map(infos.map((i) => [i.ip, { asn: i.asn, prefix: i.prefix, holder: i.asn ? holders.get(i.asn) ?? null : null }]));
 }
+
+// ---------------------------------------------------------------- 在线探针统计（信息表用）
+
+const countCache = new Map<string, Promise<number>>();
+
+/** 某国家当前在线的探针总数（只取 count，不拉列表）。 */
+export function countConnectedProbes(country: string): Promise<number> {
+  let p = countCache.get(country);
+  if (!p) {
+    p = getJson<{ count: number }>(`${ATLAS}/probes/?country_code=${country}&status=1&page_size=1&fields=id`).then((d) => d.count);
+    p.catch(() => countCache.delete(country));
+    countCache.set(country, p);
+  }
+  return p;
+}
+
+/** 经纬度矩形内、属于该国的在线探针（用于再按省界精确过滤）。跨 180° 经线的矩形由调用方拆分。 */
+export async function connectedProbesInBox(
+  country: string,
+  [[west, south], [east, north]]: [[number, number], [number, number]],
+): Promise<{ id: number; lat: number; lng: number }[]> {
+  const out: { id: number; lat: number; lng: number }[] = [];
+  const q = new URLSearchParams({
+    country_code: country,
+    status: '1',
+    latitude__gte: String(south),
+    latitude__lte: String(north),
+    longitude__gte: String(west),
+    longitude__lte: String(east),
+    page_size: '500',
+    fields: 'id,geometry',
+  });
+  let url: string | null = `${ATLAS}/probes/?${q}`;
+  while (url) {
+    const d: { next: string | null; results: ApiProbe[] } = await getJson(url);
+    for (const r of d.results) if (r.geometry) out.push({ id: r.id, lng: r.geometry.coordinates[0], lat: r.geometry.coordinates[1] });
+    url = d.next;
+  }
+  return out;
+}

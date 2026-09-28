@@ -35,6 +35,8 @@ export default defineConfig({
   plugins: [react(), devGeo()],
   // 本地开发直接用线上的测量 API（站长判定仍按本机公网 IP）。
   server: { proxy: { '/api': { target: 'https://global-network.nphunter.gg', changeOrigin: true } } },
+  // 国旗 SVG 不内联进 JS（两百多面旗，内联会让主包膨胀），每面按需加载。
+  build: { assetsInlineLimit: (file: string) => (file.includes('flag-icons') ? false : undefined) },
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],

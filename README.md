@@ -14,6 +14,14 @@ React + three.js（react-globe.gl）做的交互式地球。点击任意位置�
 
 - **中英文切换**：默认跟随浏览器语言，选择会被记住；也可以用 `?lang=zh|en` 指定。
 - **载入时拉近到访问者所在地区**：线上由 CloudFront Function `/geo` 根据 CloudFront 的 IP 地理定位请求头返回大致位置，不经第三方服务；本地开发时由 `vite.config.ts` 里的中间件模拟。拉近后会标出位置，并提供“从这里开始”按钮。
+- **拉近后展开省级行政区**：按每个国家在屏幕上的大小决定何时展开（俄罗斯在镜头高度 2.7 以下，美国、中国约 2.0，德国约 0.4，比利时约 0.12），只展开视野中心附近的国家；省名按面积从大到小放置并避免重叠，城市级不展开。
+- **地点概况表**：侧边栏标题的国家名后面显示国旗（flag-icons；台湾不显示旗帜）。标题下方列出：
+  - 省/州、国家；
+  - 时区和当地时间（tz-lookup）；
+  - 省内和全国在线的 RIPE Atlas 探针数；
+  - 省和国家人口（Wikidata、Natural Earth）；
+  - 柯本气候分类（Beck et al. 2023，1991–2020）。
+- **列表默认显示 5 个**：附近的数据中心、任选数据中心都是如此，“加载更多”每次再加 10 个。
 - **公开测试 IP**：从左上角入口打开，地球上只显示有公开测试地址的区域。
   - 每个地址都给出 IP、域名、数据源（附官方文档链接）、测量方式（ICMP 或 TCP 443）和初次检查结果。
   - 支持搜索和按厂商筛选。
@@ -85,6 +93,10 @@ src/components/           GlobeView、Panel、RegionList、RouteEstimate、Route
 | 海缆走向、登陆站、长度/运营方/投产年份 | [TeleGeography Submarine Cable Map](https://www.submarinecablemap.com/) 公开 JSON（`/api/v3/cable/cable-geo.json` 等） | **CC BY-NC-SA 3.0（禁止商用）** | 地球海缆图层、路径图的海底部分 |
 | 国家 / 省级边界、陆地、城市 | [Natural Earth](https://www.naturalearthdata.com/) | 公有领域 | 反查位置；陆地位图；陆地骨干的枢纽城市 |
 | 云区域坐标 | [jasonwilbur/mcp-server-cloud-regions](https://github.com/jasonwilbur/mcp-server-cloud-regions)（AWS、Azure、GCP），加上按官方文档手工整理的腾讯云（`scripts/extra-regions.ts`） | MIT | 数据中心点位；坐标只到城市级（云厂商不公开机房的具体位置） |
+| 省级人口 | [Wikidata](https://www.wikidata.org/)（按 ISO 3166-2 代码取最新人口） | CC0 | 地点概况表 |
+| 气候分类 | [Beck et al. 2023](https://doi.org/10.1038/s41597-023-02549-6)（`data/`） | CC BY 4.0 | 地点概况表 |
+| 时区 | [@photostructure/tz-lookup](https://github.com/photostructure/tz-lookup) | CC0 | 地点概况表 |
+| 国旗 | [flag-icons](https://github.com/lipis/flag-icons) | MIT | 侧边栏标题 |
 | 地球贴图 | NASA Blue Marble / Black Marble（随 three-globe 包分发） | 公有领域 | “城市夜光”“蓝色弹珠”视觉方案 |
 | 实测 traceroute / ping | [RIPE Atlas](https://atlas.ripe.net/) anchoring 测量 | RIPE Atlas 服务条款（数据公开） | 实测视图 |
 | 路由器地理定位 | [RIPE IPmap](https://ipmap.ripe.net/) | 同上 | 实测路径的逐跳位置 |

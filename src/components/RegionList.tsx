@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../lib/i18n.tsx';
 import { providerName, regionName } from '../lib/names.ts';
 import { PROVIDERS, PROVIDER_BY_ID } from '../lib/providers.ts';
@@ -52,12 +52,14 @@ function RegionRow({ item, max, onSelect }: { item: RankedRegion; max: number; o
   );
 }
 
-const PAGE = 12;
+/** 默认只显示 5 个，“加载更多”每次再加 10 个，避免一下子铺满。 */
+const FIRST = 5;
+const MORE = 10;
 
 /** 按估算 RTT 排好序的附近数据中心，分页展开。 */
 export function RegionList({ items, onSelect }: { items: RankedRegion[]; onSelect: (r: Region) => void }) {
   const { t } = useI18n();
-  const [limit, setLimit] = useState(PAGE);
+  const [limit, setLimit] = useState(FIRST);
   if (!items.length) return <p className="muted">{t('list.empty')}</p>;
   const shown = items.slice(0, limit);
   const max = Math.max(...shown.map((i) => i.rttMs));
@@ -69,8 +71,8 @@ export function RegionList({ items, onSelect }: { items: RankedRegion[]; onSelec
         ))}
       </ol>
       {items.length > limit && (
-        <button className="link-button" onClick={() => setLimit(limit + PAGE)}>
-          {t('list.more', { n: Math.min(PAGE, items.length - limit), total: items.length })}
+        <button className="link-button" onClick={() => setLimit(limit + MORE)}>
+          {t('list.more', { shown: limit, total: items.length })}
         </button>
       )}
     </>
@@ -82,6 +84,8 @@ export function RegionPicker({ items, onSelect }: { items: RankedRegion[]; onSel
   const { lang, t } = useI18n();
   const [query, setQuery] = useState('');
   const [provider, setProvider] = useState<ProviderId | null>(null);
+  const [limit, setLimit] = useState(FIRST);
+  useEffect(() => setLimit(FIRST), [query, provider]);
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -99,7 +103,17 @@ export function RegionPicker({ items, onSelect }: { items: RankedRegion[]; onSel
       .filter((g) => g.items.length);
   }, [items, query, provider, lang]);
 
-  const max = Math.max(1, ...groups.flatMap((g) => g.items.map((i) => i.rttMs)));
+  const total = groups.reduce((s, g) => s + g.items.length, 0);
+  // 分组展示，但总数按 limit 截断
+  let budget = limit;
+  const shown = groups
+    .map((g) => {
+      const items = g.items.slice(0, Math.max(0, budget));
+      budget -= items.length;
+      return { ...g, items };
+    })
+    .filter((g) => g.items.length);
+  const max = Math.max(1, ...shown.flatMap((g) => g.items.map((i) => i.rttMs)));
   return (
     <div className="picker">
       <input
@@ -126,7 +140,7 @@ export function RegionPicker({ items, onSelect }: { items: RankedRegion[]; onSel
         ))}
       </div>
       {!groups.length && <p className="muted">{t('list.empty')}</p>}
-      {groups.map((g) => (
+      {shown.map((g) => (
         <div key={g.provider.id} className="picker-group">
           <div className="picker-group-title">
             <span className="dot" style={{ background: g.provider.color }} />
@@ -140,6 +154,11 @@ export function RegionPicker({ items, onSelect }: { items: RankedRegion[]; onSel
           </ol>
         </div>
       ))}
+      {total > limit && (
+        <button className="link-button" onClick={() => setLimit(limit + MORE)}>
+          {t('list.more', { shown: limit, total })}
+        </button>
+      )}
     </div>
   );
 }

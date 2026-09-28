@@ -5,7 +5,8 @@ import { copyFile, mkdir, readFile, writeFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Feature, FeatureCollection, Geometry, Point, Polygon, MultiPolygon, Position } from 'geojson';
-import { geoContains } from 'd3-geo';
+import { geoArea, geoContains } from 'd3-geo';
+import { fromArrayBuffer } from 'geotiff';
 import { topology } from 'topojson-server';
 import { presimplify, simplify, quantile, sphericalTriangleArea } from 'topojson-simplify';
 import { quantize } from 'topojson-client';
@@ -34,6 +35,7 @@ const OUT = path.join(ROOT, 'public', 'data');
 const NE = 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson';
 const TG = 'https://www.submarinecablemap.com/api/v3';
 const ATLAS = 'https://atlas.ripe.net/api/v2';
+const WIKIDATA_SPARQL = 'https://query.wikidata.org/sparql';
 const CLOUD_REGIONS =
   'https://raw.githubusercontent.com/jasonwilbur/mcp-server-cloud-regions/HEAD/data/regions.json';
 
@@ -408,17 +410,84 @@ async function main() {
     iso2: p.ISO_A2_EH !== '-99' ? p.ISO_A2_EH : p.ISO_A2,
     iso3: p.ADM0_A3,
     continent: p.CONTINENT,
+    pop: typeof p.POP_EST === 'number' && p.POP_EST > 0 ? Math.round(p.POP_EST) : null,
+    popYear: typeof p.POP_YEAR === 'number' ? p.POP_YEAR : null,
   }));
   await writeFile(path.join(OUT, 'countries.topo.json'), JSON.stringify(toTopo(countriesSlim, 0.3, 'countries')));
 
+  // Natural Earth 的 area_sqkm 全是 0，这里用原始（未简化）边界计算面积。
+  const areaKm2 = (f: Feature) => {
+    let sr = geoArea(f);
+    if (sr > 2 * Math.PI) sr = 4 * Math.PI - sr; // 环绕方向反了时 d3 会算成补集
+    return Math.round(sr * 6371.0088 ** 2);
+  };
+  for (const f of admin1.features) f.properties = { ...f.properties, area_km2: areaKm2(f) };
+
+  // 省级人口：Wikidata（CC0）里按 ISO 3166-2 代码（P300）取最新一次的人口（P1082）。
+  log('Wikidata 省级人口');
+  const sparql = `SELECT ?code ?pop ?date WHERE {
+    ?item wdt:P300 ?code . ?item p:P1082 ?st . ?st ps:P1082 ?pop ; wikibase:rank ?rank .
+    FILTER(?rank != wikibase:DeprecatedRank) OPTIONAL { ?st pq:P585 ?date } }`;
+  const wd = await fetchJson<{ results: { bindings: Record<string, { value: string }>[] } }>(
+    `${WIKIDATA_SPARQL}?format=json&query=${encodeURIComponent(sparql)}`,
+    'wikidata-subdivision-population.json',
+  );
+  const popByCode = new Map<string, { pop: number; date: string }>();
+  for (const b of wd.results.bindings) {
+    const code = b.code.value;
+    const date = b.date?.value ?? '';
+    const prev = popByCode.get(code);
+    if (!prev || date > prev.date) popByCode.set(code, { pop: Math.round(Number(b.pop.value)), date });
+  }
+  for (const f of admin1.features) {
+    const hit = popByCode.get(String(f.properties?.iso_3166_2));
+    f.properties = { ...f.properties, wd_pop: hit?.pop ?? null, wd_year: hit?.date ? Number(hit.date.slice(0, 4)) : null };
+  }
   const admin1Slim = pickProps(admin1, (p) => ({
     name: p.name,
     nameZh: p.name_zh,
     iso: p.iso_3166_2,
     adm0: p.adm0_a3,
     type: p.type_en,
+    // 省名标注点与面积（km²），用于拉近时决定何时、在哪里显示省名
+    labelLat: typeof p.latitude === 'number' ? round4(p.latitude) : null,
+    labelLng: typeof p.longitude === 'number' ? round4(p.longitude) : null,
+    area: typeof p.area_km2 === 'number' && p.area_km2 > 0 ? p.area_km2 : null,
+    pop: p.wd_pop ?? null,
+    popYear: p.wd_year ?? null,
   }));
   await writeFile(path.join(OUT, 'admin1.topo.json'), JSON.stringify(toTopo(admin1Slim, 0.12, 'admin1')));
+
+  // 柯本气候分类（Beck et al. 2023，1991–2020，CC BY 4.0）：0.1° GeoTIFF 入库在 data/，
+  // 这里降采样到 0.25°（每格取众数），输出 1440×720 的 uint8 网格，0 表示海洋/无数据。
+  {
+    const buf = await readFile(path.join(ROOT, 'data', 'koppen_geiger_1991_2020_0p1.tif'));
+    const tiff = await fromArrayBuffer(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+    const image = await tiff.getImage();
+    const [src] = (await image.readRasters()) as unknown as Uint8Array[];
+    const sw = image.getWidth();
+    const sh = image.getHeight();
+    const W = 1440;
+    const H = 720;
+    const out = new Uint8Array(W * H);
+    const counts = new Uint16Array(31);
+    for (let r = 0; r < H; r++) {
+      for (let c = 0; c < W; c++) {
+        counts.fill(0);
+        for (let y = Math.floor((r * sh) / H); y < Math.floor(((r + 1) * sh) / H); y++) {
+          for (let x = Math.floor((c * sw) / W); x < Math.floor(((c + 1) * sw) / W); x++) {
+            const v = src[y * sw + x];
+            if (v > 0 && v <= 30) counts[v]++;
+          }
+        }
+        let best = 0;
+        for (let k = 1; k <= 30; k++) if (counts[k] > counts[best]) best = k;
+        out[r * W + c] = best;
+      }
+    }
+    await writeFile(path.join(OUT, 'koppen.bin'), out);
+    log(`柯本气候网格 ${W}×${H}（源 ${sw}×${sh}）`);
+  }
 
   const land = rasterizeLand(landFc);
   await writeFile(path.join(OUT, 'landmask.bin'), land.bits);
@@ -485,6 +554,8 @@ async function main() {
         { name: 'Natural Earth', url: 'https://www.naturalearthdata.com/', license: 'Public domain' },
         { name: 'cloud-regions (jasonwilbur/mcp-server-cloud-regions)', url: 'https://github.com/jasonwilbur/mcp-server-cloud-regions', license: 'MIT' },
         { name: 'RIPE Atlas', url: 'https://atlas.ripe.net/', license: 'RIPE Atlas Terms of Service' },
+        { name: 'Wikidata (subdivision population)', url: 'https://www.wikidata.org/', license: 'CC0' },
+        { name: 'Köppen-Geiger 1991–2020, Beck et al. (2023)', url: 'https://doi.org/10.1038/s41597-023-02549-6', license: 'CC BY 4.0' },
       ],
     },
   };
@@ -498,7 +569,7 @@ async function main() {
     .map((t) => ({ ...t, lat: regionById.get(t.region)!.lat, lng: regionById.get(t.region)!.lng }));
   await writeFile(path.join(OUT, 'targets.json'), JSON.stringify(targets));
   log(`公开测试目标 ${targets.targets.length} 个`);
-  for (const f of ['network.json', 'targets.json', 'countries.topo.json', 'admin1.topo.json', 'landmask.bin']) {
+  for (const f of ['network.json', 'targets.json', 'countries.topo.json', 'admin1.topo.json', 'landmask.bin', 'koppen.bin']) {
     const s = await stat(path.join(OUT, f));
     log(`  ${f}: ${(s.size / 1024).toFixed(0)} KB`);
   }

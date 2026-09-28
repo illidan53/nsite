@@ -9,3 +9,5 @@ config:
   nsite-infra:githubSubjectPrefix: repo:illidan53@11860868/nsite@1391590173
   nsite-infra:ownerIps:
     secure: AAABAHc9CbcgS9kuyNJOZo3luNCVbeiASk8gu9ZgHaGqWldfMBVRYAWBYLdx
+  nsite-infra:ripeAtlasKey:
+    secure: AAABAP1amFocQbC5MRl9ubDVNmRkJFiOUwBK4RNoXapqSmpguKafL65G4BtwUUzfr47b5S5sOvMZP1NvtKJwEtWoJFk=

@@ -1,10 +1,11 @@
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Globe, { type GlobeMethods } from 'react-globe.gl';
 import { MeshPhongMaterial } from 'three';
 import { landDots, type LandMask, type LngLat } from '../lib/geo.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { endName, providerName, regionName } from '../lib/names.ts';
-import type { CountryFeature } from '../lib/places.ts';
+import { admin1ByCountry, type Admin1Feature, type CountryFeature } from '../lib/places.ts';
+import { countryMetrics, expandedCountries, visibleProvinceLabels, type Pov } from '../lib/provinces.ts';
 import { PROVIDER_BY_ID } from '../lib/providers.ts';
 import type { EstimatedRoute, Segment } from '../lib/routing.ts';
 import type { GlobeTheme } from '../lib/themes.ts';
@@ -76,6 +77,8 @@ const arcEndLat = (d: object) => (d as Arc).to.lat;
 const arcEndLng = (d: object) => (d as Arc).to.lng;
 const arcColor = () => ['#f472b6', '#a78bfa'];
 const particlesList = (d: object) => d as object[];
+const isProvince = (d: object) => 'adm0' in ((d as Admin1Feature).properties ?? {});
+const isOutline = (d: object) => 'outline' in d;
 type Marker = { lat: number; lng: number; html: string; cls: string; title: string };
 const htmlElement = (d: object) => {
   const m = d as Marker;
@@ -92,6 +95,73 @@ function GlobeView(props: Props) {
   const { lang, t } = useI18n();
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
   const { w, h } = useWindowSize();
+
+  // ---------------------------------------------------------------- 拉近时展开省级行政区
+  const [pov, setPov] = useState<Pov>({ lat: 0, lng: 0, altitude: 2.5 });
+  const [admin1, setAdmin1] = useState<Map<string, Admin1Feature[]> | null>(null);
+  useEffect(() => {
+    admin1ByCountry().then(setAdmin1, () => setAdmin1(new Map()));
+  }, []);
+  // 旋转、缩放时 onZoom 每帧触发；最多每 250 ms 更新一次视角，停下后再补一次。
+  const povTimer = useRef<{ last: number; pending?: ReturnType<typeof setTimeout> }>({ last: 0 });
+  const handleZoom = useCallback((p: Pov) => {
+    const tm = povTimer.current;
+    clearTimeout(tm.pending);
+    const apply = () => {
+      tm.last = Date.now();
+      setPov({ lat: p.lat, lng: p.lng, altitude: p.altitude });
+    };
+    if (Date.now() - tm.last > 250) apply();
+    else tm.pending = setTimeout(apply, 250);
+  }, []);
+  const metrics = useMemo(() => countryMetrics(countries), [countries]);
+  const expandedKey = useMemo(() => expandedCountries(metrics, pov, h).join(','), [metrics, pov, h]);
+  const countryByIso = useMemo(() => new Map(countries.map((c) => [c.properties.iso3, c])), [countries]);
+  // 展开的国家：原多边形换成只画外轮廓（透明填充），下面铺上各省多边形。对象按国家缓存，保持引用稳定。
+  const outlines = useRef(new Map<string, CountryFeature & { outline: true }>());
+  const polygons = useMemo(() => {
+    const expanded = new Set(expandedKey ? expandedKey.split(',') : []);
+    const list: object[] = [];
+    for (const c of countries) {
+      const iso = c.properties.iso3;
+      if (expanded.has(iso) && admin1?.get(iso)?.length) {
+        let o = outlines.current.get(iso);
+        if (!o) outlines.current.set(iso, (o = { ...c, outline: true }));
+        list.push(o);
+      } else list.push(c);
+    }
+    for (const iso of expanded) for (const f of admin1?.get(iso) ?? []) list.push(f);
+    return list;
+  }, [countries, expandedKey, admin1]);
+  const provinceLabels = useRef(new Map<string, { lat: number; lng: number; html: string; cls: string; title: string }>());
+  const labels = useMemo(() => {
+    if (!expandedKey || !admin1) return [];
+    const provinces = expandedKey.split(',').flatMap((iso) => admin1.get(iso) ?? []);
+    // 防重叠：按面积从大到小放置，和已放置的标签在屏幕上相交就跳过
+    const globe = globeRef.current;
+    // 左上角 HUD 和打开的侧边栏所在区域不放省名，避免文字叠在面板上
+    const placed: [number, number, number, number][] = [...document.querySelectorAll('.hud > *, .panel-open')].map((el) => {
+      const r = el.getBoundingClientRect();
+      return [r.left - 4, r.top - 4, r.right + 4, r.bottom + 4];
+    });
+    const out: { lat: number; lng: number; html: string; cls: string; title: string }[] = [];
+    for (const { f, lat, lng } of visibleProvinceLabels(provinces, pov, h)) {
+      const name = lang === 'zh' && f.properties.nameZh ? f.properties.nameZh : f.properties.name;
+      if (globe) {
+        const { x, y } = globe.getScreenCoords(lat, lng, 0.004);
+        const halfW = ([...name].reduce((s, ch) => s + (ch.charCodeAt(0) > 0x2e80 ? 11.5 : 6.4), 0) + 8) / 2;
+        const box: [number, number, number, number] = [x - halfW, y - 9, x + halfW, y + 9];
+        if (box[0] < 0 || box[2] > w || box[1] < 0 || box[3] > h) continue; // 只放完整落在屏幕内的
+        if (placed.some((b) => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1])) continue;
+        placed.push(box);
+      }
+      const key = `${f.properties.iso}|${lang}|${lat}`;
+      let m = provinceLabels.current.get(key);
+      if (!m) provinceLabels.current.set(key, (m = { lat, lng, html: name, cls: 'province-label', title: '' }));
+      out.push(m);
+    }
+    return out;
+  }, [expandedKey, admin1, pov, w, h, lang]);
 
   const material = useMemo(
     () => new MeshPhongMaterial({ color: theme.globeColor, emissive: theme.globeEmissive, shininess: theme.shininess }),
@@ -161,19 +231,29 @@ function GlobeView(props: Props) {
     }
     return list;
   }, [trace, route, target, you, origin, lang, t]);
+  const htmlData = useMemo(() => [...labels, ...markers], [labels, markers]);
 
-  const polygonCap = useCallback(() => theme.polygonCap, [theme]);
-  const polygonStroke = useCallback(() => theme.polygonStroke, [theme]);
+  const polygonCap = useCallback((d: object) => (isOutline(d) ? 'rgba(0,0,0,0)' : theme.polygonCap), [theme]);
+  const polygonStroke = useCallback((d: object) => (isProvince(d) ? theme.provinceStroke : theme.polygonStroke), [theme]);
+  // 省多边形略高于地面，国家外轮廓再高一点，保证国界线画在省界之上。
+  const polygonAltitude = useCallback((d: object) => (isOutline(d) ? 0.0026 : isProvince(d) ? 0.0021 : 0.002), []);
   const ringColor = useCallback(() => (x: number) => `rgba(${theme.ring},${1 - x})`, [theme]);
 
   const polygonLabel = useCallback(
     (d: object) => {
+      if (isProvince(d)) {
+        const p = (d as Admin1Feature).properties;
+        const c = countryByIso.get(p.adm0)?.properties;
+        const name = lang === 'zh' && p.nameZh ? p.nameZh : p.name;
+        const country = c ? (lang === 'zh' && c.nameZh ? c.nameZh : c.name) : '';
+        return `<div class="tip">${esc(name)}<span>${esc(country)}${lang === 'zh' && p.nameZh ? ` · ${esc(p.name)}` : ''}</span></div>`;
+      }
       const p = (d as CountryFeature).properties;
       return lang === 'zh'
         ? `<div class="tip">${esc(p.nameZh || p.name)}<span>${esc(p.name)}</span></div>`
         : `<div class="tip">${esc(p.name)}</div>`;
     },
-    [lang],
+    [lang, countryByIso],
   );
   const pathLabel = useCallback(
     (d: object) => {
@@ -211,8 +291,10 @@ function GlobeView(props: Props) {
     [activeRange],
   );
   const targetId = target?.id;
-  const pointAltitude = useCallback((d: object) => ((d as Region).id === targetId ? 0.08 : 0.025), [targetId]);
-  const pointRadius = useCallback((d: object) => ((d as Region).id === targetId ? 0.45 : 0.22), [targetId]);
+  // 拉近时把数据中心柱子按档缩小，避免在省级视角下变成巨大的圆柱
+  const pointScale = pov.altitude < 0.25 ? 0.12 : pov.altitude < 0.6 ? 0.3 : pov.altitude < 1.2 ? 0.6 : 1;
+  const pointAltitude = useCallback((d: object) => ((d as Region).id === targetId ? 0.08 : 0.025) * pointScale, [targetId, pointScale]);
+  const pointRadius = useCallback((d: object) => ((d as Region).id === targetId ? 0.45 : 0.22) * pointScale, [targetId, pointScale]);
   const handleGlobeClick = useCallback(({ lat, lng }: { lat: number; lng: number }) => onPick(lat, lng), [onPick]);
   // 点到国家多边形、点阵或海缆线上时，globe 不会触发 onGlobeClick，这里同样当作选点。
   const handleObjectClick = useCallback(
@@ -242,11 +324,12 @@ function GlobeView(props: Props) {
       atmosphereColor={theme.atmosphere}
       atmosphereAltitude={theme.atmosphereAltitude}
       onGlobeClick={handleGlobeClick}
-      polygonsData={countries}
+      onZoom={handleZoom}
+      polygonsData={polygons}
       polygonCapColor={polygonCap}
       polygonSideColor={polygonSide}
       polygonStrokeColor={polygonStroke}
-      polygonAltitude={0.002}
+      polygonAltitude={polygonAltitude}
       polygonsTransitionDuration={0}
       onPolygonClick={handleObjectClick}
       onPathClick={handleObjectClick}
@@ -299,7 +382,7 @@ function GlobeView(props: Props) {
       arcDashGap={0.15}
       arcDashAnimateTime={1800}
       arcsTransitionDuration={0}
-      htmlElementsData={markers}
+      htmlElementsData={htmlData}
       htmlLat="lat"
       htmlLng="lng"
       htmlAltitude={0.01}

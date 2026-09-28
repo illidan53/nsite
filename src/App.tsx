@@ -259,6 +259,7 @@ export default function App() {
   const onLand = Boolean(sp);
   return (
     <div className="app" style={{ background: theme.background }}>
+      <div className="globe-layer">
       <GlobeView
         theme={theme}
         countries={data.countries}
@@ -279,6 +280,7 @@ export default function App() {
         onPick={pick}
         onRegionClick={onRegionClick}
       />
+      </div>
 
       <div className={`hud ${panelOpen && mobile ? 'hud-hidden' : ''}`}>
         <h1>

@@ -17,6 +17,8 @@ export interface GlobeTheme {
   atmosphereAltitude: number;
   polygonCap: string;
   polygonStroke: string;
+  /** 展开后的省界线（比国界淡）。 */
+  provinceStroke: string;
   /** 陆地点阵：点间距（度）、像素大小、颜色。 */
   dots: { color: string; spacing: number; size: number } | null;
   cableAlpha: number;
@@ -45,6 +47,7 @@ export const THEMES: Record<ThemeId, GlobeTheme> = {
     atmosphereAltitude: 0.16,
     polygonCap: 'rgba(52, 78, 112, 0.55)',
     polygonStroke: 'rgba(140, 170, 210, 0.35)',
+    provinceStroke: 'rgba(140, 170, 210, 0.16)',
     dots: null,
     cableAlpha: 0.75,
     plannedAlpha: 0.35,
@@ -68,6 +71,7 @@ export const THEMES: Record<ThemeId, GlobeTheme> = {
     atmosphereAltitude: 0.18,
     polygonCap: 'rgba(0, 0, 0, 0)',
     polygonStroke: 'rgba(255, 255, 255, 0.10)',
+    provinceStroke: 'rgba(255, 255, 255, 0.07)',
     dots: null,
     cableAlpha: 0.7,
     plannedAlpha: 0.3,
@@ -91,6 +95,7 @@ export const THEMES: Record<ThemeId, GlobeTheme> = {
     atmosphereAltitude: 0.2,
     polygonCap: 'rgba(0, 0, 0, 0)',
     polygonStroke: 'rgba(255, 255, 255, 0.22)',
+    provinceStroke: 'rgba(255, 255, 255, 0.13)',
     dots: null,
     cableAlpha: 0.85,
     plannedAlpha: 0.35,
@@ -114,6 +119,7 @@ export const THEMES: Record<ThemeId, GlobeTheme> = {
     atmosphereAltitude: 0.14,
     polygonCap: 'rgba(0, 0, 0, 0)',
     polygonStroke: 'rgba(0, 0, 0, 0)',
+    provinceStroke: 'rgba(96, 140, 210, 0.22)',
     dots: { color: '#5f8bd0', spacing: 0.9, size: 2.2 },
     cableAlpha: 0.6,
     plannedAlpha: 0.25,
@@ -137,6 +143,7 @@ export const THEMES: Record<ThemeId, GlobeTheme> = {
     atmosphereAltitude: 0.12,
     polygonCap: 'rgba(196, 208, 224, 0.95)',
     polygonStroke: 'rgba(120, 138, 164, 0.6)',
+    provinceStroke: 'rgba(120, 138, 164, 0.32)',
     dots: null,
     cableAlpha: 0.9,
     plannedAlpha: 0.4,

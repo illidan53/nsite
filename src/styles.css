@@ -113,8 +113,16 @@ button {
   height: 100%;
 }
 
+/* 地球（含其中的省名、标记等 HTML 元素）整体在面板之下 */
+.globe-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
 .hud {
   position: absolute;
+  z-index: 5;
   top: 20px;
   left: 20px;
   max-width: 380px;
@@ -254,9 +262,11 @@ button {
   accent-color: var(--sub);
 }
 
+/* 云厂商每行一个，竖排在左上角，不挡地球 */
 .legend {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
 }
 
@@ -296,6 +306,7 @@ button {
 
 .attribution {
   position: absolute;
+  z-index: 5;
   left: 20px;
   bottom: 12px;
   font-size: 11px;
@@ -362,6 +373,20 @@ button {
   border: 2px solid #fff;
   box-shadow: 0 0 0 6px rgba(52, 211, 153, 0.25), 0 0 16px rgba(52, 211, 153, 0.6);
 }
+/* 拉近后展开的省名 */
+.province-label {
+  font: 500 11px/1.2 system-ui, -apple-system, 'PingFang SC', sans-serif;
+  color: rgba(226, 232, 240, 0.82);
+  text-shadow: 0 0 3px rgba(3, 6, 12, 0.9), 0 0 6px rgba(3, 6, 12, 0.6);
+  white-space: nowrap;
+  pointer-events: none;
+  letter-spacing: 0.2px;
+}
+:root[data-ui='light'] .province-label {
+  color: #3b4a60;
+  text-shadow: 0 0 3px #fff, 0 0 6px rgba(255, 255, 255, 0.9);
+}
+
 .marker-waypoint {
   width: 7px;
   height: 7px;
@@ -413,6 +438,50 @@ button {
   font-weight: 500;
   color: var(--muted);
 }
+.flag {
+  display: inline-block;
+  width: 20px;
+  height: 15px;
+  margin-left: 6px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--border);
+  vertical-align: -1px;
+  object-fit: cover;
+}
+.place-country .flag {
+  margin-left: 5px;
+}
+
+/* 点击位置概况表 */
+.place-info {
+  margin: 2px 0 12px;
+}
+.place-info table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.place-info th {
+  width: 96px;
+  padding: 5px 8px 5px 0;
+  text-align: left;
+  font-weight: 500;
+  color: var(--muted);
+  vertical-align: top;
+  white-space: nowrap;
+}
+.place-info td {
+  padding: 5px 0;
+  overflow-wrap: anywhere;
+}
+.place-info tr + tr > * {
+  border-top: 1px solid var(--border);
+}
+.place-info-src {
+  font-size: 10.5px;
+  margin: 6px 0 0;
+}
+
 .place-sub {
   color: var(--muted);
   font-size: 12px;
@@ -1014,9 +1083,10 @@ button {
   .hud h1 {
     font-size: 18px;
   }
+  /* 手机上 HUD 本来就占满宽度，厂商改回横排 */
   .legend {
-    max-height: 64px;
-    overflow-y: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
   }
   .panel {
     top: auto;

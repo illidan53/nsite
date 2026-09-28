@@ -11,6 +11,8 @@ export interface CountryProps {
   iso2: string;
   iso3: string;
   continent: string;
+  pop: number | null;
+  popYear: number | null;
 }
 
 export interface Admin1Props {
@@ -19,10 +21,17 @@ export interface Admin1Props {
   iso: string;
   adm0: string;
   type: string | null;
+  labelLat: number | null;
+  labelLng: number | null;
+  /** 面积（km²）。 */
+  area: number | null;
+  /** 人口（Wikidata）。 */
+  pop: number | null;
+  popYear: number | null;
 }
 
 export type CountryFeature = Feature<Geometry, CountryProps>;
-type Admin1Feature = Feature<Geometry, Admin1Props>;
+export type Admin1Feature = Feature<Geometry, Admin1Props>;
 
 interface Indexed<F> {
   f: F;
@@ -73,6 +82,8 @@ function loadAdmin1() {
 export interface Place {
   country: CountryProps | null;
   admin1: Admin1Props | null;
+  /** 省级多边形（统计省内探针数用）。 */
+  admin1Feature?: Admin1Feature | null;
 }
 
 export function lookupCountry(countries: CountryFeature[], lat: number, lng: number): CountryProps | null {
@@ -84,11 +95,17 @@ export async function lookupPlace(countries: CountryFeature[], lat: number, lng:
   const country = lookupCountry(countries, lat, lng);
   if (!country) return { country: null, admin1: null };
   const byCountry = await loadAdmin1();
-  const admin1 = find(byCountry.get(country.iso3) ?? [], lng, lat)?.properties ?? null;
-  return { country, admin1 };
+  const admin1Feature = find(byCountry.get(country.iso3) ?? [], lng, lat);
+  return { country, admin1: admin1Feature?.properties ?? null, admin1Feature };
 }
 
 /** 预加载省级数据（体积较大，首屏之后再取）。 */
 export function prefetchAdmin1() {
   void loadAdmin1();
+}
+
+/** 按国家（ADM0_A3）分组的省级行政区，供拉近时在地球上展开显示。 */
+export async function admin1ByCountry(): Promise<Map<string, Admin1Feature[]>> {
+  const byCountry = await loadAdmin1();
+  return new Map([...byCountry].map(([k, list]) => [k, list.map((x) => x.f)]));
 }
