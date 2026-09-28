@@ -69,7 +69,7 @@ export default function RouteAtlas({ region, origin, anchorProbes, onOverlay }: 
     return () => ctrl.abort();
   }, [current, anchor]);
 
-  const target = useMemo(() => (anchor ? { lat: anchor.lat, lng: anchor.lng, label: anchor.fqdn } : null), [anchor]);
+  const target = useMemo(() => (anchor ? { lat: anchor.lat, lng: anchor.lng, label: anchor.fqdn, city: anchor.city } : null), [anchor]);
 
   if (!region.anchors.length) {
     return (

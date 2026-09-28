@@ -89,8 +89,7 @@ const zh = {
   'atlas.colLoc': '位置',
   'atlas.private': '内网',
   'atlas.badLoc': '与 RTT 矛盾：光在这么短的时间内到不了这里，IP 定位多半有误',
-  'atlas.footnote':
-    '跳点位置来自 RIPE IPmap，归属网络来自 RIPEstat。Δ 为与上一跳最小 RTT 之差，路由器对 ICMP 的处理优先级较低，个别跳会出现负值或尖峰。划线的位置不满足光速约束（RTT 太小、距离太远），已从地球上的路径中排除。',
+  'atlas.footnote': '跳点位置来自 RIPE IPmap，归属网络来自 RIPEstat；“≈”表示没有定位数据、按 RTT 与相邻跳相同推断的位置。Δ 为与上一跳最小 RTT 之差，路由器对 ICMP 的处理优先级较低，个别跳会出现负值或尖峰。划线的位置不满足光速约束，已排除。地球上同一城市的连续几跳合并成一个标记（如 9–11），相邻地点之间按海缆和陆地图画出推测的物理路径。',
   'mine.noticeTitle': '站长实测：站长个人 RIPE Atlas 账号发起',
   'mine.notice': '站长花自己的 RIPE Atlas 积分，从 RIPE Atlas 上他人托管的探针，对该数据中心的公开地址做 traceroute。批量测量覆盖各国（大国到省/州）离得最近的几个区域；站长本人的网络地址也可以随时补测。测量与 RIPE NCC 及各云厂商均无关联，结果公开在 RIPE Atlas 上，仅供参考。',
   'mine.target': '目标：',
@@ -119,7 +118,6 @@ const zh = {
   'tip.planned': '规划中',
   'tip.rfs': '投产 {year}',
   'marker.probe': '探针 #{id}',
-  'marker.hop': '第 {hop} 跳 {ip} · {city}',
   'marker.you': '你大概在这里（按 IP 推断）',
   'info.province': '省 / 州',
   'info.country': '国家 / 地区',
@@ -178,6 +176,16 @@ const zh = {
   'mine.from': '起点 {cell}',
   'mine.fromNear': '起点 {cell}（同国最近的已测地区）',
   'mine.unreached': '未到达',
+  'atlas.leg.sub': '经海缆 {cables}（推测）· {km} km',
+  'atlas.leg.land': '陆路（推测）· {km} km',
+  'atlas.leg.unknown': '路径未知 · 直线 {km} km',
+  'atlas.legTitle': '按海缆和陆地图找的物理最短路径，只是推测：traceroute 看不到实际走哪条光缆。这一段实测多了 {delta} ms，这条路径按光速至少要 {floor} ms。',
+  'atlas.legTitleNoDelta': '按海缆和陆地图找的物理最短路径，只是推测：traceroute 看不到实际走哪条光缆。',
+  'atlas.inferred': '没有定位数据；RTT 与第 {hop} 跳几乎相同，按同一城市推断',
+  'atlas.inferredProbe': '没有定位数据（或是内网地址）；RTT 与探针处几乎相同，按探针所在城市推断',
+  'atlas.nearProbe': '探针所在地',
+  'marker.probeHops': '探针 #{id} · 第 {hops} 跳',
+  'marker.hops': '第 {hops} 跳 · {city}',
 };
 
 export type MessageKey = keyof typeof zh;
@@ -269,8 +277,7 @@ const en: Record<MessageKey, string> = {
   'atlas.colLoc': 'Location',
   'atlas.private': 'private',
   'atlas.badLoc': 'Contradicts the RTT: light cannot get this far that quickly, so the IP location is probably wrong',
-  'atlas.footnote':
-    'Hop locations from RIPE IPmap, networks from RIPEstat. Δ is the change in minimum RTT from the previous hop; routers answer ICMP at low priority, so some hops show negative values or spikes. Struck-out locations fail the speed-of-light check and are left off the globe.',
+  'atlas.footnote': 'Hop locations from RIPE IPmap, networks from RIPEstat; “≈” marks a hop with no location data, placed where a neighboring hop with the same RTT is. Δ is the change in minimum RTT from the previous hop; routers answer ICMP at low priority, so some hops show negative values or spikes. Struck-out locations fail the speed-of-light check and are left out. On the globe, consecutive hops in one city share a marker (e.g. 9–11), and the lines between places follow the inferred physical path over cables and land.',
   'mine.noticeTitle': 'Owner-measured: run from the site owner’s personal RIPE Atlas account',
   'mine.notice': 'The owner spends their own RIPE Atlas credits to run traceroutes from probes that other people host on RIPE Atlas to this data center’s public address. Batch runs cover the nearest regions from every country (states or provinces in large countries), and the owner can add single runs from their own network. Not affiliated with RIPE NCC or any cloud provider; results are public on RIPE Atlas and for reference only.',
   'mine.target': 'Target:',
@@ -299,7 +306,6 @@ const en: Record<MessageKey, string> = {
   'tip.planned': 'planned',
   'tip.rfs': 'in service {year}',
   'marker.probe': 'Probe #{id}',
-  'marker.hop': 'Hop {hop} {ip} · {city}',
   'marker.you': 'Roughly where you are (from your IP)',
   'info.province': 'Province / state',
   'info.country': 'Country / area',
@@ -358,6 +364,16 @@ const en: Record<MessageKey, string> = {
   'mine.from': 'from {cell}',
   'mine.fromNear': 'from {cell} (nearest measured area in this country)',
   'mine.unreached': 'not reached',
+  'atlas.leg.sub': 'via {cables} cable (inferred) · {km} km',
+  'atlas.leg.land': 'overland (inferred) · {km} km',
+  'atlas.leg.unknown': 'path unknown · {km} km straight line',
+  'atlas.legTitle': 'Shortest physical path through the cable and land graph, inferred only: traceroute cannot see which fiber was used. This leg added {delta} ms; this path needs at least {floor} ms at the speed of light.',
+  'atlas.legTitleNoDelta': 'Shortest physical path through the cable and land graph, inferred only: traceroute cannot see which fiber was used.',
+  'atlas.inferred': 'No location data; RTT is almost the same as hop {hop}, so it is placed in the same city',
+  'atlas.inferredProbe': 'No location data (or a private address); RTT is almost the same as at the probe, so it is placed in the probe’s city',
+  'atlas.nearProbe': 'probe’s city',
+  'marker.probeHops': 'Probe #{id} · hops {hops}',
+  'marker.hops': 'Hops {hops} · {city}',
 };
 
 const MESSAGES: Record<Lang, Record<MessageKey, string>> = { zh, en };

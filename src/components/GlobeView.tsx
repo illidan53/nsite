@@ -13,8 +13,24 @@ import type { Cable, Region } from '../lib/types.ts';
 import { useWindowSize } from '../lib/useWindowSize.ts';
 
 export interface TraceOverlay {
-  /** 按顺序排列的已定位节点（探针 → 各跳 → 目标）。 */
-  points: { lat: number; lng: number; label: string; kind: 'probe' | 'hop' | 'target'; hop?: number }[];
+  /** 按顺序排列的地点（探针 → 各跳 → 目标）；同一地点的连续几跳合并成一个，hops 是它们的跳数。 */
+  points: { lat: number; lng: number; label: string; kind: 'probe' | 'hop' | 'target'; hops: number[] }[];
+  /** 相邻两个地点之间推测的物理路径（陆路或海缆）。 */
+  legs: TraceLeg[];
+}
+
+export interface TraceLeg {
+  coords: LngLat[];
+  kind: 'direct' | 'land' | 'sub' | 'unknown';
+  label: string;
+}
+
+/** 跳数列表显示成“9–11”这样的范围。 */
+export function hopRange(hops: number[]) {
+  if (!hops.length) return '';
+  const lo = Math.min(...hops);
+  const hi = Math.max(...hops);
+  return lo === hi ? String(lo) : `${lo}–${hi}`;
 }
 
 export interface CameraTarget {
@@ -52,7 +68,8 @@ interface Props {
 
 type PathDatum =
   | { type: 'cable'; cable: Cable; coords: LngLat[] }
-  | { type: 'route'; seg: Segment; index: number; coords: LngLat[] };
+  | { type: 'route'; seg: Segment; index: number; coords: LngLat[] }
+  | { type: 'trace'; leg: TraceLeg; coords: LngLat[] };
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const inRange = (i: number, [a, b]: [number, number]) => i >= a && i <= b;
@@ -67,17 +84,15 @@ const polygonSide = () => 'rgba(0,0,0,0)';
 const pointLat = (p: LngLat) => p[1];
 const pointLng = (p: LngLat) => p[0];
 const isRoute = (d: object) => (d as PathDatum).type === 'route';
-const pathAlt = (d: object) => (isRoute(d) ? 0.006 : 0.003);
-const pathDashLength = (d: object) => (isRoute(d) ? 0.08 : 1);
-const pathDashGap = (d: object) => (isRoute(d) ? 0.02 : 0);
-const pathDashAnimate = (d: object) => (isRoute(d) ? 2500 : 0);
+const isTrace = (d: object) => (d as PathDatum).type === 'trace';
+const isCable = (d: object) => (d as PathDatum).type === 'cable';
+const pathAlt = (d: object) => (isTrace(d) ? 0.007 : isRoute(d) ? 0.006 : 0.003);
+const pathDashLength = (d: object) => (isCable(d) ? 1 : 0.08);
+const pathDashGap = (d: object) => (isCable(d) ? 0 : 0.02);
+const pathDashAnimate = (d: object) => (isCable(d) ? 0 : 2500);
 const pointColor = (d: object) => PROVIDER_BY_ID[(d as Region).provider].color;
-type Arc = { from: { lat: number; lng: number }; to: { lat: number; lng: number } };
-const arcStartLat = (d: object) => (d as Arc).from.lat;
-const arcStartLng = (d: object) => (d as Arc).from.lng;
-const arcEndLat = (d: object) => (d as Arc).to.lat;
-const arcEndLng = (d: object) => (d as Arc).to.lng;
-const ARC_COLORS = { mine: ['#34d399', '#059669'], atlas: ['#c4b5fd', '#7c3aed'] } as const;
+/** 实测路径的颜色（与面板里“站长实测”“锚点参考”一致），浅色界面用深一档。 */
+const TRACE_COLORS = { mine: { light: '#059669', dark: '#34d399' }, atlas: { light: '#7c3aed', dark: '#a78bfa' } } as const;
 const particlesList = (d: object) => d as object[];
 const isProvince = (d: object) => 'adm0' in ((d as Admin1Feature).properties ?? {});
 const isOutline = (d: object) => 'outline' in d;
@@ -187,7 +202,12 @@ function GlobeView(props: Props) {
     [route],
   );
 
-  const paths = useMemo(() => [...cablePaths, ...routePaths], [cablePaths, routePaths]);
+  const tracePaths = useMemo<PathDatum[]>(
+    () => trace?.legs.filter((l) => l.coords.length > 1).map((leg) => ({ type: 'trace' as const, leg, coords: leg.coords })) ?? [],
+    [trace],
+  );
+
+  const paths = useMemo(() => [...cablePaths, ...routePaths, ...tracePaths], [cablePaths, routePaths, tracePaths]);
   const dimCables = Boolean(route || trace);
 
   useEffect(() => {
@@ -201,11 +221,6 @@ function GlobeView(props: Props) {
     if (camera) globeRef.current?.pointOfView(camera, camera.ms ?? 1200);
   }, [camera]);
 
-  const arcs = useMemo(() => {
-    if (!trace) return [];
-    const pts = trace.points;
-    return pts.slice(1).map((p, i): Arc => ({ from: pts[i], to: p }));
-  }, [trace]);
 
   const markers = useMemo(() => {
     const list: Marker[] = [];
@@ -215,7 +230,7 @@ function GlobeView(props: Props) {
           lat: p.lat,
           lng: p.lng,
           cls: `marker marker-${p.kind}${p.kind === 'hop' ? ` marker-hop-${traceSource}` : ''}`,
-          html: p.kind === 'hop' ? String(p.hop) : p.kind === 'probe' ? 'P' : '◎',
+          html: p.kind === 'hop' ? hopRange(p.hops) : p.kind === 'probe' ? 'P' : '◎',
           title: p.label,
         });
       }
@@ -261,6 +276,7 @@ function GlobeView(props: Props) {
   const pathLabel = useCallback(
     (d: object) => {
       const p = d as PathDatum;
+      if (p.type === 'trace') return `<div class="tip">${esc(p.leg.label)}</div>`;
       if (p.type === 'cable') {
         const c = p.cable;
         const status = c.planned ? t('tip.planned') : t('tip.rfs', { year: c.rfsYear ?? '?' });
@@ -283,14 +299,15 @@ function GlobeView(props: Props) {
     (d: object) => {
       const p = d as PathDatum;
       if (p.type === 'cable') return withAlpha(p.cable.color, dimCables ? theme.dimAlpha : p.cable.planned ? theme.plannedAlpha : theme.cableAlpha);
+      if (p.type === 'trace') return TRACE_COLORS[traceSource][theme.ui === 'light' ? 'light' : 'dark'];
       const base = p.seg.kind === 'sub' ? theme.routeSub : theme.routeLand;
       if (!activeRange) return base;
       return inRange(p.index, activeRange) ? theme.highlight : withAlpha(base, 0.4);
     },
-    [dimCables, activeRange, theme],
+    [dimCables, activeRange, theme, traceSource],
   );
   const pathStroke = useCallback(
-    (d: object) => (isRoute(d) ? (activeRange && inRange((d as { index: number }).index, activeRange) ? 3.2 : 2) : null),
+    (d: object) => (isTrace(d) ? 2.4 : isRoute(d) ? (activeRange && inRange((d as { index: number }).index, activeRange) ? 3.2 : 2) : null),
     [activeRange],
   );
   const targetId = target?.id;
@@ -298,7 +315,6 @@ function GlobeView(props: Props) {
   const pointScale = pov.altitude < 0.25 ? 0.12 : pov.altitude < 0.6 ? 0.3 : pov.altitude < 1.2 ? 0.6 : 1;
   const pointAltitude = useCallback((d: object) => ((d as Region).id === targetId ? 0.08 : 0.025) * pointScale, [targetId, pointScale]);
   const pointRadius = useCallback((d: object) => ((d as Region).id === targetId ? 0.45 : 0.22) * pointScale, [targetId, pointScale]);
-  const arcColor = useCallback(() => [...ARC_COLORS[traceSource]], [traceSource]);
   const handleGlobeClick = useCallback(({ lat, lng }: { lat: number; lng: number }) => onPick(lat, lng), [onPick]);
   // 点到国家多边形、点阵或海缆线上时，globe 不会触发 onGlobeClick，这里同样当作选点。
   const handleObjectClick = useCallback(
@@ -374,18 +390,6 @@ function GlobeView(props: Props) {
       ringMaxRadius={2.5}
       ringPropagationSpeed={2}
       ringRepeatPeriod={900}
-      arcsData={arcs}
-      arcStartLat={arcStartLat}
-      arcStartLng={arcStartLng}
-      arcEndLat={arcEndLat}
-      arcEndLng={arcEndLng}
-      arcColor={arcColor}
-      arcStroke={0.5}
-      arcAltitudeAutoScale={0.35}
-      arcDashLength={0.5}
-      arcDashGap={0.15}
-      arcDashAnimateTime={1800}
-      arcsTransitionDuration={0}
       htmlElementsData={htmlData}
       htmlLat="lat"
       htmlLng="lng"

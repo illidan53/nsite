@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LandMask, haversineKm } from './geo.ts';
-import { ACCESS_RTT_MS, FIBER_KM_PER_MS, LAND_INFLATION, buildRouteGraph, estimateRtt, routeTo, shortestFrom } from './routing.ts';
+import { ACCESS_RTT_MS, FIBER_KM_PER_MS, LAND_INFLATION, buildRouteGraph, estimateRtt, pathBetween, routeTo, shortestFrom } from './routing.ts';
 import type { NetworkData, Region } from './types.ts';
 
 // 两块“大陆”，中间隔着海：西大陆 lng 0..10，东大陆 lng 20..30，纬度 0..10。
@@ -141,4 +141,31 @@ describe('routing', () => {
     for (const e of g.adj[origin]) expect(e.km).toBeGreaterThan(0);
     expect(LAND_INFLATION).toBeGreaterThan(1);
   });
+
+  it('puts a hop-to-hop leg across the sea on the cable and keeps overland legs direct', () => {
+    const data = makeData();
+    const g = buildRouteGraph(data, makeLand());
+    const west = data.regions[0];
+    const sp = shortestFrom(g, 5, 4)!;
+    const before = routeTo(g, sp, west)!;
+
+    const sea = pathBetween(g, { lat: 5, lng: 3 }, { lat: 5, lng: 27 });
+    expect(sea.kind).toBe('sub');
+    expect(sea.cables.map((c) => c.name)).toEqual(['Test Cable']);
+    expect(sea.km).toBeGreaterThan(haversineKm(5, 3, 5, 27));
+    const [first, last] = [sea.coords[0], sea.coords[sea.coords.length - 1]];
+    expect([first[0], first[1], last[0], last[1]].map((x) => Math.round(x * 1e6) / 1e6)).toEqual([3, 5, 27, 5]);
+
+    const land = pathBetween(g, { lat: 2, lng: 1 }, { lat: 8, lng: 8 });
+    expect(land.kind).toBe('land');
+    expect(land.rttMs).toBeCloseTo((2 * haversineKm(2, 1, 8, 8) * LAND_INFLATION) / FIBER_KM_PER_MS, 5);
+
+    // 计算中途接入的临时点不能影响点击起点已有的最短路结果
+    expect(routeTo(g, sp, west)).toEqual(before);
+    // 再算一次起点最短路也一样（临时点留下的空节点不可达）
+    const again = shortestFrom(g, 5, 4)!;
+    expect(Array.from(again.dist.slice(0, sp.dist.length))).toEqual(Array.from(sp.dist));
+    expect(Array.from(again.dist.slice(sp.dist.length))).toEqual(Array(again.dist.length - sp.dist.length).fill(Infinity));
+  });
 });
+

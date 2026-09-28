@@ -5,6 +5,7 @@ import TargetsPanel from './components/TargetsPanel.tsx';
 import type { RankedRegion } from './components/RegionList.tsx';
 import { whoami } from './lib/api.ts';
 import { loadAppData, type AppData } from './lib/data.ts';
+import { RouteGraphContext } from './lib/graphContext.ts';
 import { bestRtt, loadMeasured, measuredOriginFor } from './lib/measured.ts';
 import { haversineKm, interpolateGreatCircle } from './lib/geo.ts';
 import { useI18n, type Lang } from './lib/i18n.tsx';
@@ -363,6 +364,7 @@ export default function App() {
         onClose={() => setIpsOpen(false)}
       />
 
+      <RouteGraphContext value={data.graph}>
       <Panel
         open={Boolean(origin) && !ipsOpen}
         origin={origin}
@@ -384,6 +386,7 @@ export default function App() {
         onHoverRange={setActiveRange}
         onOverlay={setOverlay}
       />
+      </RouteGraphContext>
 
       <footer className="attribution">
         {t('footer.cables')} ©{' '}

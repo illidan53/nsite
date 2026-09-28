@@ -157,7 +157,7 @@ export default function PersonalMeasure({ region, origin, place, publicTarget, m
 
   const probe = entry?.probes[selected];
   const trace = results?.find((r) => r.probeId === probe?.id) ?? null;
-  const target = useMemo(() => ({ lat: region.lat, lng: region.lng, label: entry?.target ?? region.code }), [region, entry]);
+  const target = useMemo(() => ({ lat: region.lat, lng: region.lng, label: entry?.target ?? region.code, city: region.city }), [region, entry]);
   const lastHop = trace ? [...trace.hops].reverse().find((h) => h.minRtt !== null) : undefined;
 
   useEffect(() => {

@@ -195,38 +195,44 @@ export interface ShortestPaths {
   prevEdge: (GEdge | null)[];
 }
 
-/**
- * 把点击位置作为临时起点接入图中，然后跑单源最短路。
- * 点击位置不在陆地上时返回 null。
- */
-export function shortestFrom(g: RouteGraph, lat: number, lng: number): ShortestPaths | null {
-  if (!g.land.nearLand(lng, lat, 5)) return null;
+/** 临时接入图中的点：点击起点，以及计算 traceroute 相邻两跳之间路径时的两端。 */
+const TEMP_KEYS = ['origin', 'leg:a', 'leg:b'] as const;
+type TempKey = (typeof TEMP_KEYS)[number];
 
-  // 移除上一次的临时起点
-  const old = g.index.get('origin');
-  if (old !== undefined) {
-    for (const e of g.adj[old]) g.adj[e.to] = g.adj[e.to].filter((x) => x.to !== old);
-    g.adj[old] = [];
-    g.nodes[old] = { ...g.nodes[old], lat, lng };
-  }
-  const origin =
-    old ??
+function detachPoint(g: RouteGraph, key: TempKey): number | undefined {
+  const i = g.index.get(key);
+  if (i === undefined) return undefined;
+  for (const e of g.adj[i]) g.adj[e.to] = g.adj[e.to].filter((x) => x.to !== i);
+  g.adj[i] = [];
+  return i;
+}
+
+function tempNodes(g: RouteGraph): Set<number> {
+  return new Set(TEMP_KEYS.map((k) => g.index.get(k)).filter((i): i is number => i !== undefined));
+}
+
+/** 把一个临时点接入图：30 km 内有枢纽城市或机房就只接本地，否则接最近几个能走陆路到达的枢纽和登陆站。 */
+function attachPoint(g: RouteGraph, key: TempKey, lat: number, lng: number): number {
+  const idx =
+    detachPoint(g, key) ??
     (() => {
-      g.index.set('origin', g.nodes.length);
-      g.nodes.push({ key: 'origin', kind: 'origin', lat, lng, name: 'Origin' });
+      g.index.set(key, g.nodes.length);
+      g.nodes.push({ key, kind: 'origin', lat, lng, name: 'Origin' });
       g.adj.push([]);
       return g.nodes.length - 1;
     })();
+  g.nodes[idx] = { ...g.nodes[idx], lat, lng };
 
+  const temp = tempNodes(g);
   const near = g.nodes
-    .map((n, i) => ({ i, n, d: n.kind === 'cv' || i === origin ? Infinity : haversineKm(lat, lng, n.lat, n.lng) }))
+    .map((n, i) => ({ i, n, d: n.kind === 'cv' || temp.has(i) ? Infinity : haversineKm(lat, lng, n.lat, n.lng) }))
     .filter((x) => x.d < 3000)
     .sort((a, b) => a.d - b.d);
   const connect = (i: number, d: number) => {
     const km = d * LAND_INFLATION;
     const ms = km / FIBER_KM_PER_MS;
-    g.adj[origin].push({ to: i, km, ms, kind: 'land' });
-    g.adj[i].push({ to: origin, km, ms, kind: 'land' });
+    g.adj[idx].push({ to: i, km, ms, kind: 'land' });
+    g.adj[i].push({ to: idx, km, ms, kind: 'land' });
   };
   // 附近 30 km 内有枢纽城市或机房时只接入本地节点，路径展示更贴近“先到本地骨干”。
   const local = near.filter((x) => x.d < 30);
@@ -247,20 +253,29 @@ export function shortestFrom(g: RouteGraph, lat: number, lng: number): ShortestP
     if (isHub) hubs++;
     else lps++;
   }
+  return idx;
+}
 
+/** 单源最短路；不经过其它临时点（它们只是起终点，不是网络节点）。给了 target 时到达即停。 */
+function dijkstra(g: RouteGraph, source: number, target?: number): ShortestPaths {
+  const blocked = tempNodes(g);
+  blocked.delete(source);
+  if (target !== undefined) blocked.delete(target);
   const n = g.nodes.length;
   const dist = new Float64Array(n).fill(Infinity);
   const ms = new Float64Array(n).fill(Infinity);
   const prev = new Int32Array(n).fill(-1);
   const prevEdge: (GEdge | null)[] = new Array(n).fill(null);
-  dist[origin] = 0;
-  ms[origin] = 0;
+  dist[source] = 0;
+  ms[source] = 0;
   const heap = new MinHeap();
-  heap.push([0, origin]);
+  heap.push([0, source]);
   while (heap.size) {
     const [d, u] = heap.pop();
     if (d > dist[u]) continue;
+    if (u === target) break;
     for (const e of g.adj[u]) {
+      if (blocked.has(e.to)) continue;
       const nd = d + e.ms + (e.kind === 'land' ? HOP_PENALTY_MS : 0) + (e.attach ? CABLE_ENTRY_PENALTY_MS / 2 : 0);
       if (nd < dist[e.to]) {
         dist[e.to] = nd;
@@ -271,26 +286,31 @@ export function shortestFrom(g: RouteGraph, lat: number, lng: number): ShortestP
       }
     }
   }
-  return { origin, dist, ms, prev, prevEdge };
+  return { origin: source, dist, ms, prev, prevEdge };
 }
 
-/** 从最短路结果中取出到某区域的路径，并合并成可读的分段。 */
-export function routeTo(g: RouteGraph, sp: ShortestPaths, region: Region): EstimatedRoute | null {
-  const target = g.index.get(`dc:${region.id}`);
-  if (target === undefined || !Number.isFinite(sp.dist[target])) return null;
+/**
+ * 把点击位置作为临时起点接入图中，然后跑单源最短路。
+ * 点击位置不在陆地上时返回 null。
+ */
+export function shortestFrom(g: RouteGraph, lat: number, lng: number): ShortestPaths | null {
+  if (!g.land.nearLand(lng, lat, 5)) return null;
+  return dijkstra(g, attachPoint(g, 'origin', lat, lng));
+}
 
+/** 最短路上到 target 的各段（相邻的同一条海缆合并成一段）。 */
+function extractSegments(g: RouteGraph, sp: ShortestPaths, target: number): Segment[] {
   const path: { node: number; edge: GEdge | null }[] = [];
   for (let v = target; v !== -1; v = sp.prev[v]) path.unshift({ node: v, edge: sp.prevEdge[v] });
 
-  const origin = g.nodes[sp.origin];
   const end = (n: GNode): SegmentEnd => ({ kind: n.kind, name: n.name, nameZh: n.nameZh, code: n.code });
-  const segments: Segment[] = [{ kind: 'access', from: null, to: null, km: 0, oneWayMs: ACCESS_RTT_MS / 2, coords: [] }];
+  const segments: Segment[] = [];
   for (let k = 1; k < path.length; k++) {
     const e = path[k].edge!;
     const a = g.nodes[path[k - 1].node];
     const b = g.nodes[path[k].node];
     const last = segments[segments.length - 1];
-    if (e.kind === 'sub' && last.kind === 'sub' && last.cable === g.cables[e.cable!] && a.kind === 'cv') {
+    if (e.kind === 'sub' && last?.kind === 'sub' && last.cable === g.cables[e.cable!] && a.kind === 'cv') {
       last.km += e.km;
       last.oneWayMs += e.ms;
       last.coords.push([b.lng, b.lat]);
@@ -319,7 +339,19 @@ export function routeTo(g: RouteGraph, sp: ShortestPaths, region: Region): Estim
       });
     }
   }
+  return segments;
+}
 
+/** 从最短路结果中取出到某区域的路径，并合并成可读的分段。 */
+export function routeTo(g: RouteGraph, sp: ShortestPaths, region: Region): EstimatedRoute | null {
+  const target = g.index.get(`dc:${region.id}`);
+  if (target === undefined || !Number.isFinite(sp.dist[target])) return null;
+
+  const origin = g.nodes[sp.origin];
+  const segments: Segment[] = [
+    { kind: 'access', from: null, to: null, km: 0, oneWayMs: ACCESS_RTT_MS / 2, coords: [] },
+    ...extractSegments(g, sp, target),
+  ];
   const oneWay = segments.reduce((s, x) => s + x.oneWayMs, 0);
   const gc = haversineKm(origin.lat, origin.lng, region.lat, region.lng);
   return {
@@ -328,6 +360,62 @@ export function routeTo(g: RouteGraph, sp: ShortestPaths, region: Region): Estim
     km: segments.reduce((s, x) => s + x.km, 0),
     floorRttMs: (2 * gc) / FIBER_KM_PER_MS,
   };
+}
+
+/** traceroute 相邻两个已定位跳之间推测的物理路径。 */
+export interface PhysicalLeg {
+  /** direct：两点很近；land：走陆路；sub：至少经过一段海缆；unknown：图里找不到（按大圆画）。 */
+  kind: 'direct' | 'land' | 'sub' | 'unknown';
+  km: number;
+  /** 这条路径的理论往返时延（光纤光速）。 */
+  rttMs: number;
+  coords: LngLat[];
+  cables: Cable[];
+}
+
+/** 两段之间直接相连的阈值：更近的两跳直接连线。 */
+const DIRECT_KM = 150;
+
+/**
+ * 两个地点之间最可能的物理路径：大圆基本在陆地上就走陆路，否则在海缆 + 陆地图里找最短路径。
+ * traceroute 只知道路由器在哪，不知道中间走哪条光缆，所以这只是推测。
+ */
+export function pathBetween(g: RouteGraph, a: { lat: number; lng: number }, b: { lat: number; lng: number }): PhysicalLeg {
+  const gc = haversineKm(a.lat, a.lng, b.lat, b.lng);
+  const straight = (kind: PhysicalLeg['kind'], factor: number): PhysicalLeg => ({
+    kind,
+    km: gc * factor,
+    rttMs: (2 * gc * factor) / FIBER_KM_PER_MS,
+    coords: greatCirclePoints([a.lng, a.lat], [b.lng, b.lat], 50),
+    cables: [],
+  });
+  if (gc < DIRECT_KM) return straight('direct', 1);
+  if (g.land.overlandPath([a.lng, a.lat], [b.lng, b.lat])) return straight('land', LAND_INFLATION);
+  if (!g.land.nearLand(a.lng, a.lat, 50) || !g.land.nearLand(b.lng, b.lat, 50)) return straight('unknown', 1);
+
+  const ia = attachPoint(g, 'leg:a', a.lat, a.lng);
+  const ib = attachPoint(g, 'leg:b', b.lat, b.lng);
+  try {
+    const sp = dijkstra(g, ia, ib);
+    if (!Number.isFinite(sp.dist[ib])) return straight('unknown', 1);
+    const segments = extractSegments(g, sp, ib);
+    const cables = [...new Set(segments.filter((s) => s.cable).map((s) => s.cable!))];
+    const coords: LngLat[] = [];
+    for (const s of segments) {
+      const first = coords[coords.length - 1];
+      coords.push(...(first && first[0] === s.coords[0][0] && first[1] === s.coords[0][1] ? s.coords.slice(1) : s.coords));
+    }
+    return {
+      kind: cables.length ? 'sub' : 'land',
+      km: segments.reduce((sum, s) => sum + s.km, 0),
+      rttMs: 2 * segments.reduce((sum, s) => sum + s.oneWayMs, 0),
+      coords,
+      cables,
+    };
+  } finally {
+    detachPoint(g, 'leg:a');
+    detachPoint(g, 'leg:b');
+  }
 }
 
 /** 到某区域的估算 RTT（不展开路径）。不可达时退化为大圆 × 1.5。 */
