@@ -92,7 +92,7 @@ export function RegionList({ items, onSelect }: { items: RankedRegion[]; onSelec
   );
 }
 
-/** 从全部数据中心里任选一个：按厂商筛选 + 搜索，结果按厂商分组。 */
+/** 从全部数据中心里任选一个：按厂商筛选 + 搜索，保持传入的延迟顺序（从小到大）。 */
 export function RegionPicker({ items, onSelect }: { items: RankedRegion[]; onSelect: (r: Region) => void }) {
   const { lang, t } = useI18n();
   const [query, setQuery] = useState('');
@@ -100,33 +100,18 @@ export function RegionPicker({ items, onSelect }: { items: RankedRegion[]; onSel
   const [limit, setLimit] = useState(FIRST);
   useEffect(() => setLimit(FIRST), [query, provider]);
 
-  const groups = useMemo(() => {
+  const matched = useMemo(() => {
     const q = query.trim().toLowerCase();
     const match = (r: Region) =>
       !q ||
       [r.code, r.name, r.nameZh ?? '', r.city, r.country, PROVIDER_BY_ID[r.provider].name, PROVIDER_BY_ID[r.provider].nameZh ?? '']
         .some((s) => s.toLowerCase().includes(q));
-    return PROVIDERS.filter((p) => !provider || p.id === provider)
-      .map((p) => ({
-        provider: p,
-        items: items
-          .filter((i) => i.region.provider === p.id && match(i.region))
-          .sort((a, b) => regionName(a.region, lang).localeCompare(regionName(b.region, lang))),
-      }))
-      .filter((g) => g.items.length);
-  }, [items, query, provider, lang]);
+    return items.filter((i) => (!provider || i.region.provider === provider) && match(i.region));
+  }, [items, query, provider]);
 
-  const total = groups.reduce((s, g) => s + g.items.length, 0);
-  // 分组展示，但总数按 limit 截断
-  let budget = limit;
-  const shown = groups
-    .map((g) => {
-      const items = g.items.slice(0, Math.max(0, budget));
-      budget -= items.length;
-      return { ...g, items };
-    })
-    .filter((g) => g.items.length);
-  const max = Math.max(1, ...shown.flatMap((g) => g.items.map((i) => i.rttMs)));
+  const total = matched.length;
+  const shown = matched.slice(0, limit);
+  const max = Math.max(1, ...shown.map((i) => i.rttMs));
   return (
     <div className="picker">
       <input
@@ -152,21 +137,12 @@ export function RegionPicker({ items, onSelect }: { items: RankedRegion[]; onSel
           </button>
         ))}
       </div>
-      {!groups.length && <p className="muted">{t('list.empty')}</p>}
-      {shown.map((g) => (
-        <div key={g.provider.id} className="picker-group">
-          <div className="picker-group-title">
-            <span className="dot" style={{ background: g.provider.color }} />
-            {providerName(g.provider, lang)}
-            <span className="muted">{g.items.length}</span>
-          </div>
-          <ol className="region-list">
-            {g.items.map((item) => (
-              <RegionRow key={item.region.id} item={item} max={max} onSelect={onSelect} />
-            ))}
-          </ol>
-        </div>
-      ))}
+      {!total && <p className="muted">{t('list.empty')}</p>}
+      <ol className="region-list">
+        {shown.map((item) => (
+          <RegionRow key={item.region.id} item={item} max={max} onSelect={onSelect} />
+        ))}
+      </ol>
       {total > limit && (
         <button className="link-button" onClick={() => setLimit(limit + MORE)}>
           {t('list.more', { shown: limit, total })}

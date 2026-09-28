@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useI18n } from '../lib/i18n.tsx';
 import { bestRtt, type MeasuredOrigin } from '../lib/measured.ts';
 import { providerName, regionName } from '../lib/names.ts';
@@ -56,13 +56,27 @@ export default function Panel(props: Props) {
   const country = place?.country;
   const admin1 = place?.admin1;
   const [sortBy, setSortBy] = useState<SortBy>('estimate');
-  const hasMine = nearby.some((r) => r.mineMs !== null);
-  const sorted = useMemo(
-    () =>
+  const hasMine = all.some((r) => r.mineMs !== null);
+  // 两个列表都按延迟从小到大：默认用模型估算（传入时已排好）；选“实测”时有实测的在前，其余仍按估算。
+  const byLatency = useCallback(
+    (items: RankedRegion[]) =>
       sortBy === 'mine' && hasMine
-        ? [...nearby].sort((a, b) => (a.mineMs ?? Infinity) - (b.mineMs ?? Infinity) || a.rttMs - b.rttMs)
-        : nearby,
-    [nearby, sortBy, hasMine],
+        ? [...items].sort((a, b) => (a.mineMs ?? Infinity) - (b.mineMs ?? Infinity) || a.rttMs - b.rttMs)
+        : items,
+    [sortBy, hasMine],
+  );
+  const sortedNearby = useMemo(() => byLatency(nearby), [byLatency, nearby]);
+  const sortedAll = useMemo(() => byLatency(all), [byLatency, all]);
+  const sortControl = hasMine ? (
+    <span className="sort-toggle" role="group" aria-label={t('panel.sortBy')}>
+      {(['estimate', 'mine'] as SortBy[]).map((k) => (
+        <button key={k} className={`src-${k} ${sortBy === k ? 'sort-on' : ''}`} aria-pressed={sortBy === k} onClick={() => setSortBy(k)}>
+          {t(`sort.${k}`)}
+        </button>
+      ))}
+    </span>
+  ) : (
+    <span className="muted">{t('panel.nearbySort')}</span>
   );
 
   const runDate = (i: number) => measuredData?.runs[i]?.createdAt.slice(0, 10) ?? '';
@@ -185,26 +199,14 @@ export default function Panel(props: Props) {
                 storageKey="nsite-section-nearby"
                 defaultOpen
                 title={t('panel.nearby')}
-                aside={
-                  hasMine ? (
-                    <span className="sort-toggle" role="group" aria-label={t('panel.sortBy')}>
-                      {(['estimate', 'mine'] as SortBy[]).map((k) => (
-                        <button key={k} className={`src-${k} ${sortBy === k ? 'sort-on' : ''}`} aria-pressed={sortBy === k} onClick={() => setSortBy(k)}>
-                          {t(`sort.${k}`)}
-                        </button>
-                      ))}
-                    </span>
-                  ) : (
-                    <span className="muted">{t('panel.nearbySort')}</span>
-                  )
-                }
+                aside={sortControl}
               >
                 <SourceLegend note={legendNote} />
                 {!onLand && <p className="muted small">{t('panel.oceanNote')}</p>}
-                <RegionList key={`${origin.lat},${origin.lng},${sortBy}`} items={sorted} onSelect={(r) => props.onSelect(r)} />
+                <RegionList key={`${origin.lat},${origin.lng},${sortBy}`} items={sortedNearby} onSelect={(r) => props.onSelect(r)} />
               </Section>
-              <Section storageKey="nsite-section-any" defaultOpen={false} title={t('panel.any')} aside={<span className="muted">{all.length}</span>}>
-                <RegionPicker items={all} onSelect={(r) => props.onSelect(r)} />
+              <Section storageKey="nsite-section-any" defaultOpen={false} title={t('panel.any')} aside={sortControl}>
+                <RegionPicker items={sortedAll} onSelect={(r) => props.onSelect(r)} />
               </Section>
             </div>
           )}
