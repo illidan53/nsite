@@ -6,3 +6,4 @@ config:
   nsite-infra:bucketName: nsite-global-network
   nsite-infra:githubOwner: illidan53
   nsite-infra:githubRepo: nsite
+  nsite-infra:githubSubjectPrefix: repo:illidan53@11860868/nsite@1391590173

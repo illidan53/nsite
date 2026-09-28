@@ -13,6 +13,12 @@ const bucketName = config.require("bucketName");
 const githubOwner = config.require("githubOwner");
 const githubRepo = config.require("githubRepo");
 const githubBranch = config.get("githubBranch") ?? "main";
+// 仓库启用了 GitHub 的不可变 OIDC subject（带 owner/仓库数字 ID），仓库改名或被重建后旧信任不会被冒用。
+// 查询：gh api repos/<owner>/<repo>/actions/oidc/customization/sub
+const githubSubjectPrefix = config.require("githubSubjectPrefix");
+if (!new RegExp(`^repo:${githubOwner}@\\d+/${githubRepo}@\\d+$`).test(githubSubjectPrefix)) {
+  throw new Error("githubSubjectPrefix 必须是该仓库的不可变 OIDC 前缀，例如 repo:owner@123/repo@456");
+}
 const githubOidcProviderArn =
   config.get("githubOidcProviderArn") ??
   `arn:aws:iam::${accountId}:oidc-provider/token.actions.githubusercontent.com`;
@@ -92,7 +98,6 @@ const distribution = new aws.cloudfront.Distribution("siteCdn", {
       domainName: bucket.bucketRegionalDomainName,
       originId,
       originAccessControlId: oac.id,
-      s3OriginConfig: { originAccessIdentity: "" },
     },
   ],
   defaultCacheBehavior: {
@@ -163,7 +168,7 @@ const deployRole = new aws.iam.Role("githubDeployRole", {
         Condition: {
           StringEquals: {
             "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-            "token.actions.githubusercontent.com:sub": `repo:${githubOwner}/${githubRepo}:ref:refs/heads/${githubBranch}`,
+            "token.actions.githubusercontent.com:sub": `${githubSubjectPrefix}:ref:refs/heads/${githubBranch}`,
           },
         },
       },
