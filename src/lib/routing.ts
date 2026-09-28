@@ -24,8 +24,15 @@ export interface GNode {
   kind: NodeKind;
   lat: number;
   lng: number;
-  label: string;
+  /** 英文名；中文名只有城市和阿里云/腾讯云区域才有。显示时按语言选择。 */
+  name: string;
+  nameZh?: string;
+  /** 数据中心的区域代码。 */
+  code?: string;
 }
+
+/** 分段两端的节点描述（不含坐标），界面按当前语言渲染。 */
+export type SegmentEnd = Pick<GNode, 'kind' | 'name' | 'nameZh' | 'code'>;
 
 interface GEdge {
   to: number;
@@ -47,8 +54,8 @@ export interface RouteGraph {
 
 export interface Segment {
   kind: 'access' | 'land' | 'sub';
-  from: string;
-  to: string;
+  from: SegmentEnd | null;
+  to: SegmentEnd | null;
   km: number;
   /** 单程时延（ms）。往返贡献为 2 倍。 */
   oneWayMs: number;
@@ -86,14 +93,14 @@ export function buildRouteGraph(data: NetworkData, land: LandMask): RouteGraph {
   };
 
   for (const h of data.hubs) {
-    addNode({ key: h.id, kind: 'city', lat: h.lat, lng: h.lng, label: h.nameZh && h.nameZh !== h.name ? `${h.nameZh}（${h.name}）` : h.name });
+    addNode({ key: h.id, kind: 'city', lat: h.lat, lng: h.lng, name: h.name, nameZh: h.nameZh !== h.name ? h.nameZh : undefined });
   }
   for (const r of data.regions) {
-    addNode({ key: `dc:${r.id}`, kind: 'dc', lat: r.lat, lng: r.lng, label: `${r.name}（${r.code}）` });
+    addNode({ key: `dc:${r.id}`, kind: 'dc', lat: r.lat, lng: r.lng, name: r.name, nameZh: r.nameZh, code: r.code });
   }
   const lpById = new Map(data.landingPoints.map((lp) => [lp.id, lp]));
   for (const lp of data.landingPoints) {
-    addNode({ key: `lp:${lp.id}`, kind: 'lp', lat: lp.lat, lng: lp.lng, label: lp.name });
+    addNode({ key: `lp:${lp.id}`, kind: 'lp', lat: lp.lat, lng: lp.lng, name: lp.name });
   }
 
   // 陆地骨干
@@ -113,7 +120,7 @@ export function buildRouteGraph(data: NetworkData, land: LandMask): RouteGraph {
       for (const [lng, lat] of line) {
         // TeleGeography 在 180° 经线处把线段切开（-180 与 180 两个点），合并为同一顶点，否则跨太平洋海缆会断开。
         const keyLng = Math.abs(lng) > 179.99 ? 180 : lng;
-        const v = addNode({ key: `cv:${ci}:${keyLng},${lat}`, kind: 'cv', lat, lng, label: c.name });
+        const v = addNode({ key: `cv:${ci}:${keyLng},${lat}`, kind: 'cv', lat, lng, name: c.name });
         if (prev >= 0 && prev !== v) {
           const p = nodes[prev];
           link(prev, v, haversineKm(p.lat, p.lng, lat, lng) * scale, 'sub', ci);
@@ -206,7 +213,7 @@ export function shortestFrom(g: RouteGraph, lat: number, lng: number): ShortestP
     old ??
     (() => {
       g.index.set('origin', g.nodes.length);
-      g.nodes.push({ key: 'origin', kind: 'origin', lat, lng, label: '起点' });
+      g.nodes.push({ key: 'origin', kind: 'origin', lat, lng, name: 'Origin' });
       g.adj.push([]);
       return g.nodes.length - 1;
     })();
@@ -276,9 +283,8 @@ export function routeTo(g: RouteGraph, sp: ShortestPaths, region: Region): Estim
   for (let v = target; v !== -1; v = sp.prev[v]) path.unshift({ node: v, edge: sp.prevEdge[v] });
 
   const origin = g.nodes[sp.origin];
-  const segments: Segment[] = [
-    { kind: 'access', from: '终端', to: '接入网', km: 0, oneWayMs: ACCESS_RTT_MS / 2, coords: [] },
-  ];
+  const end = (n: GNode): SegmentEnd => ({ kind: n.kind, name: n.name, nameZh: n.nameZh, code: n.code });
+  const segments: Segment[] = [{ kind: 'access', from: null, to: null, km: 0, oneWayMs: ACCESS_RTT_MS / 2, coords: [] }];
   for (let k = 1; k < path.length; k++) {
     const e = path[k].edge!;
     const a = g.nodes[path[k - 1].node];
@@ -288,12 +294,12 @@ export function routeTo(g: RouteGraph, sp: ShortestPaths, region: Region): Estim
       last.km += e.km;
       last.oneWayMs += e.ms;
       last.coords.push([b.lng, b.lat]);
-      last.to = b.label;
+      last.to = end(b);
     } else if (e.kind === 'sub') {
       segments.push({
         kind: 'sub',
-        from: a.label,
-        to: b.label,
+        from: end(a),
+        to: end(b),
         km: e.km,
         oneWayMs: e.ms,
         cable: g.cables[e.cable!],
@@ -305,8 +311,8 @@ export function routeTo(g: RouteGraph, sp: ShortestPaths, region: Region): Estim
     } else {
       segments.push({
         kind: 'land',
-        from: a.label,
-        to: b.label,
+        from: end(a),
+        to: end(b),
         km: e.km,
         oneWayMs: e.ms,
         coords: greatCirclePoints([a.lng, a.lat], [b.lng, b.lat], 50),

@@ -1,10 +1,13 @@
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import Globe, { type GlobeMethods } from 'react-globe.gl';
 import { MeshPhongMaterial } from 'three';
-import type { LngLat } from '../lib/geo.ts';
+import { landDots, type LandMask, type LngLat } from '../lib/geo.ts';
+import { useI18n } from '../lib/i18n.tsx';
+import { endName, providerName, regionName } from '../lib/names.ts';
 import type { CountryFeature } from '../lib/places.ts';
 import { PROVIDER_BY_ID } from '../lib/providers.ts';
 import type { EstimatedRoute, Segment } from '../lib/routing.ts';
+import type { GlobeTheme } from '../lib/themes.ts';
 import type { Cable, Region } from '../lib/types.ts';
 import { useWindowSize } from '../lib/useWindowSize.ts';
 
@@ -17,15 +20,22 @@ export interface CameraTarget {
   lat: number;
   lng: number;
   altitude: number;
+  /** 过渡时长（ms）。 */
+  ms?: number;
 }
 
 interface Props {
+  theme: GlobeTheme;
   countries: CountryFeature[];
+  land: LandMask;
   cables: Cable[];
   showCables: boolean;
   showPlanned: boolean;
   regions: Region[];
   origin: { lat: number; lng: number } | null;
+  /** 按访问者 IP 推断的位置。 */
+  you: { lat: number; lng: number } | null;
+  autoRotate: boolean;
   route: EstimatedRoute | null;
   /** 高亮的分段区间 [起, 止]（含）。 */
   activeRange: [number, number] | null;
@@ -41,10 +51,7 @@ type PathDatum =
   | { type: 'cable'; cable: Cable; coords: LngLat[] }
   | { type: 'route'; seg: Segment; index: number; coords: LngLat[] };
 
-const SUB_COLOR = '#38bdf8';
-const LAND_COLOR = '#fbbf24';
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-
 const inRange = (i: number, [a, b]: [number, number]) => i >= a && i <= b;
 
 function withAlpha(hex: string, alpha: number) {
@@ -53,13 +60,7 @@ function withAlpha(hex: string, alpha: number) {
 }
 
 // 不依赖状态的访问器放在模块级，保持引用稳定（react-globe.gl 按引用比较 props，变化就会重算整层）。
-const polygonCap = () => 'rgba(52, 78, 112, 0.55)';
 const polygonSide = () => 'rgba(0,0,0,0)';
-const polygonStroke = () => 'rgba(140, 170, 210, 0.35)';
-const polygonLabel = (d: object) => {
-  const p = (d as CountryFeature).properties;
-  return `<div class="tip">${esc(p.nameZh || p.name)}<span>${esc(p.name)}</span></div>`;
-};
 const pointLat = (p: LngLat) => p[1];
 const pointLng = (p: LngLat) => p[0];
 const isRoute = (d: object) => (d as PathDatum).type === 'route';
@@ -67,27 +68,14 @@ const pathAlt = (d: object) => (isRoute(d) ? 0.006 : 0.003);
 const pathDashLength = (d: object) => (isRoute(d) ? 0.08 : 1);
 const pathDashGap = (d: object) => (isRoute(d) ? 0.02 : 0);
 const pathDashAnimate = (d: object) => (isRoute(d) ? 2500 : 0);
-const pathLabel = (d: object) => {
-  const p = d as PathDatum;
-  if (p.type === 'cable') {
-    const c = p.cable;
-    return `<div class="tip">${esc(c.name)}<span>${c.planned ? '规划中' : `投产 ${c.rfsYear ?? '?'}`}${c.lengthKm ? ` · ${c.lengthKm.toLocaleString()} km` : ''}</span></div>`;
-  }
-  return `<div class="tip">${esc(p.seg.from)} → ${esc(p.seg.to)}<span>约 ${(p.seg.oneWayMs * 2).toFixed(1)} ms RTT</span></div>`;
-};
 const pointColor = (d: object) => PROVIDER_BY_ID[(d as Region).provider].color;
-const pointLabel = (d: object) => {
-  const r = d as Region;
-  const p = PROVIDER_BY_ID[r.provider];
-  return `<div class="tip"><b style="color:${p.color}">${esc(p.name)}</b> ${esc(r.name)}<span>${esc(r.code)} · ${esc(r.city)}</span></div>`;
-};
-const ringColor = () => (t: number) => `rgba(255,255,255,${1 - t})`;
 type Arc = { from: { lat: number; lng: number }; to: { lat: number; lng: number } };
 const arcStartLat = (d: object) => (d as Arc).from.lat;
 const arcStartLng = (d: object) => (d as Arc).from.lng;
 const arcEndLat = (d: object) => (d as Arc).to.lat;
 const arcEndLng = (d: object) => (d as Arc).to.lng;
 const arcColor = () => ['#f472b6', '#a78bfa'];
+const particlesList = (d: object) => d as object[];
 type Marker = { lat: number; lng: number; html: string; cls: string; title: string };
 const htmlElement = (d: object) => {
   const m = d as Marker;
@@ -99,14 +87,15 @@ const htmlElement = (d: object) => {
 };
 
 function GlobeView(props: Props) {
-  const { countries, cables, showCables, showPlanned, regions, origin, route, activeRange, trace, target, camera, offset, onPick, onRegionClick } =
-    props;
+  const { theme, countries, land, cables, showCables, showPlanned, regions, origin, you, autoRotate, route, activeRange, trace, target } = props;
+  const { camera, offset, onPick, onRegionClick } = props;
+  const { lang, t } = useI18n();
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
   const { w, h } = useWindowSize();
 
   const material = useMemo(
-    () => new MeshPhongMaterial({ color: '#0b1a2e', emissive: '#040a14', shininess: 6 }),
-    [],
+    () => new MeshPhongMaterial({ color: theme.globeColor, emissive: theme.globeEmissive, shininess: theme.shininess }),
+    [theme],
   );
 
   // 海缆路径只随开关变化，避免每次选路都重建上千条线。
@@ -131,12 +120,12 @@ function GlobeView(props: Props) {
   useEffect(() => {
     const controls = globeRef.current?.controls();
     if (!controls) return;
-    controls.autoRotate = !origin;
+    controls.autoRotate = autoRotate;
     controls.autoRotateSpeed = 0.35;
-  }, [origin]);
+  }, [autoRotate]);
 
   useEffect(() => {
-    if (camera) globeRef.current?.pointOfView(camera, 1200);
+    if (camera) globeRef.current?.pointOfView(camera, camera.ms ?? 1200);
   }, [camera]);
 
   const arcs = useMemo(() => {
@@ -161,24 +150,61 @@ function GlobeView(props: Props) {
       route.segments.forEach((s, i) => {
         if (s.coords.length < 2 || i === 0) return;
         const [lng, lat] = s.coords[0];
-        list.push({ lat, lng, cls: 'marker marker-waypoint', html: '', title: s.from });
+        list.push({ lat, lng, cls: 'marker marker-waypoint', html: '', title: endName(s.from, lang, t) });
       });
     }
     if (target) {
-      list.push({ lat: target.lat, lng: target.lng, cls: 'marker marker-target', html: '', title: target.name });
+      list.push({ lat: target.lat, lng: target.lng, cls: 'marker marker-target', html: '', title: regionName(target, lang) });
+    }
+    if (you && !origin) {
+      list.push({ lat: you.lat, lng: you.lng, cls: 'marker marker-you', html: '', title: t('marker.you') });
     }
     return list;
-  }, [trace, route, target]);
+  }, [trace, route, target, you, origin, lang, t]);
+
+  const polygonCap = useCallback(() => theme.polygonCap, [theme]);
+  const polygonStroke = useCallback(() => theme.polygonStroke, [theme]);
+  const ringColor = useCallback(() => (x: number) => `rgba(${theme.ring},${1 - x})`, [theme]);
+
+  const polygonLabel = useCallback(
+    (d: object) => {
+      const p = (d as CountryFeature).properties;
+      return lang === 'zh'
+        ? `<div class="tip">${esc(p.nameZh || p.name)}<span>${esc(p.name)}</span></div>`
+        : `<div class="tip">${esc(p.name)}</div>`;
+    },
+    [lang],
+  );
+  const pathLabel = useCallback(
+    (d: object) => {
+      const p = d as PathDatum;
+      if (p.type === 'cable') {
+        const c = p.cable;
+        const status = c.planned ? t('tip.planned') : t('tip.rfs', { year: c.rfsYear ?? '?' });
+        return `<div class="tip">${esc(c.name)}<span>${esc(status)}${c.lengthKm ? ` · ${c.lengthKm.toLocaleString()} km` : ''}</span></div>`;
+      }
+      return `<div class="tip">${esc(endName(p.seg.from, lang, t))} → ${esc(endName(p.seg.to, lang, t))}<span>≈ ${(p.seg.oneWayMs * 2).toFixed(1)} ms RTT</span></div>`;
+    },
+    [lang, t],
+  );
+  const pointLabel = useCallback(
+    (d: object) => {
+      const r = d as Region;
+      const p = PROVIDER_BY_ID[r.provider];
+      return `<div class="tip"><b style="color:${p.color}">${esc(providerName(p, lang))}</b> ${esc(regionName(r, lang))}<span>${esc(r.code)} · ${esc(r.city)}</span></div>`;
+    },
+    [lang],
+  );
 
   const pathColor = useCallback(
     (d: object) => {
       const p = d as PathDatum;
-      if (p.type === 'cable') return withAlpha(p.cable.color, dimCables ? 0.18 : p.cable.planned ? 0.35 : 0.75);
-      const base = p.seg.kind === 'sub' ? SUB_COLOR : LAND_COLOR;
+      if (p.type === 'cable') return withAlpha(p.cable.color, dimCables ? theme.dimAlpha : p.cable.planned ? theme.plannedAlpha : theme.cableAlpha);
+      const base = p.seg.kind === 'sub' ? theme.routeSub : theme.routeLand;
       if (!activeRange) return base;
-      return inRange(p.index, activeRange) ? '#ffffff' : withAlpha(base, 0.4);
+      return inRange(p.index, activeRange) ? theme.highlight : withAlpha(base, 0.4);
     },
-    [dimCables, activeRange],
+    [dimCables, activeRange, theme],
   );
   const pathStroke = useCallback(
     (d: object) => (isRoute(d) ? (activeRange && inRange((d as { index: number }).index, activeRange) ? 3.2 : 2) : null),
@@ -188,13 +214,18 @@ function GlobeView(props: Props) {
   const pointAltitude = useCallback((d: object) => ((d as Region).id === targetId ? 0.08 : 0.025), [targetId]);
   const pointRadius = useCallback((d: object) => ((d as Region).id === targetId ? 0.45 : 0.22), [targetId]);
   const handleGlobeClick = useCallback(({ lat, lng }: { lat: number; lng: number }) => onPick(lat, lng), [onPick]);
-  // 点到国家多边形或海缆线上时，globe 不会触发 onGlobeClick，这里同样当作选点。
-  const handlePolygonClick = useCallback(
+  // 点到国家多边形、点阵或海缆线上时，globe 不会触发 onGlobeClick，这里同样当作选点。
+  const handleObjectClick = useCallback(
     (_p: object, _e: MouseEvent, { lat, lng }: { lat: number; lng: number }) => onPick(lat, lng),
     [onPick],
   );
   const handlePointClick = useCallback((d: object) => onRegionClick(d as Region), [onRegionClick]);
   const rings = useMemo(() => (origin ? [origin] : []), [origin]);
+  // 点阵：由陆地位图生成，按间距缓存。
+  const dotSpacing = theme.dots?.spacing;
+  const dots = useMemo(() => (dotSpacing ? [landDots(land, dotSpacing)] : []), [land, dotSpacing]);
+  const dotColor = useCallback(() => theme.dots?.color ?? '#ffffff', [theme]);
+  const dotSize = useCallback(() => theme.dots?.size ?? 1, [theme]);
 
   return (
     <Globe
@@ -202,11 +233,14 @@ function GlobeView(props: Props) {
       width={w}
       height={h}
       globeOffset={offset}
-      backgroundColor="#03060c"
+      backgroundColor={theme.background}
+      backgroundImageUrl={theme.backgroundImage}
+      globeImageUrl={theme.globeImage}
+      bumpImageUrl={theme.bumpImage}
       globeMaterial={material}
       showAtmosphere
-      atmosphereColor="#4a8cff"
-      atmosphereAltitude={0.16}
+      atmosphereColor={theme.atmosphere}
+      atmosphereAltitude={theme.atmosphereAltitude}
       onGlobeClick={handleGlobeClick}
       polygonsData={countries}
       polygonCapColor={polygonCap}
@@ -214,9 +248,17 @@ function GlobeView(props: Props) {
       polygonStrokeColor={polygonStroke}
       polygonAltitude={0.002}
       polygonsTransitionDuration={0}
-      onPolygonClick={handlePolygonClick}
-      onPathClick={handlePolygonClick}
+      onPolygonClick={handleObjectClick}
+      onPathClick={handleObjectClick}
       polygonLabel={polygonLabel}
+      particlesData={dots}
+      particlesList={particlesList}
+      particleLat="lat"
+      particleLng="lng"
+      particleAltitude={0.002}
+      particlesSize={dotSize}
+      particlesSizeAttenuation={false}
+      particlesColor={dotColor}
       pathsData={paths}
       pathPoints="coords"
       pathPointLat={pointLat}

@@ -3,12 +3,24 @@
 React + three.js（react-globe.gl）做的交互式地球。点击任意位置，右侧 off-canvas 面板会显示：
 
 1. **位置**：国家 + 省/州，用 Natural Earth 边界离线反查，不调用第三方接口；
-2. **附近的云数据中心**：共 11 家厂商、307 个区域（AWS / Azure / GCP / 阿里云 / 腾讯云 / Oracle / DigitalOcean / Vultr / Linode / OVH / Hetzner），按估算 RTT 排序；
-3. **到每个数据中心的延迟**，点开后可以查看网络路径，有两种视图：
+2. **附近的云数据中心**：目前 4 家厂商、174 个区域（AWS / Azure / GCP / 腾讯云），按估算 RTT 排序，可展开、收起；
+3. **选择任意数据中心**：也可展开、收起。支持搜索（厂商、区域代码、城市）和按厂商筛选，结果按厂商分组，能看从当前位置到任意一个机房的路径；
+4. **到每个数据中心的延迟**，点开后可以查看网络路径，有两种视图：
+   - **站长实测**：用站长个人的 RIPE Atlas 账号，从点击所在国家、离点击处最近的 3 个在线探针，向该数据中心的公开测试地址跑 traceroute。只有站长的来源 IP 能触发，其他访客只能查看已有结果；每次测量都附 RIPE Atlas 的公开链接。
    - **物理路径估算**：在“海缆真实走向 + 陆地骨干近似”组成的图上求最短路径，逐段给出距离、单段 RTT、累计 RTT、经过的海缆（名称、投产年份、运营方），路线同步画在地球上；
-   - **RIPE Atlas 实测**：取离点击位置最近的 RIPE Atlas 探针到该机房（或同城锚点）的最新 traceroute，逐跳给出 IP、所属 AS、城市位置、RTT 和相邻跳之间的增量，并把路径画在地球上。
+   - **公开锚点数据**：取离点击位置最近的 RIPE Atlas 探针到该机房（或同城锚点）的最新 traceroute，逐跳给出 IP、所属 AS、城市位置、RTT 和相邻跳之间的增量，并把路径画在地球上。
 
-支持 URL 深链接：`/?lat=31.23&lng=121.47&dc=aws:ap-northeast-1&tab=atlas`。
+其他功能：
+
+- **中英文切换**：默认跟随浏览器语言，选择会被记住；也可以用 `?lang=zh|en` 指定。
+- **载入时拉近到访问者所在地区**：线上由 CloudFront Function `/geo` 根据 CloudFront 的 IP 地理定位请求头返回大致位置，不经第三方服务；本地开发时由 `vite.config.ts` 里的中间件模拟。拉近后会标出位置，并提供“从这里开始”按钮。
+- **公开测试 IP**：从左上角入口打开，地球上只显示有公开测试地址的区域。
+  - 每个地址都给出 IP、域名、数据源（附官方文档链接）、测量方式（ICMP 或 TCP 443）和初次检查结果。
+  - 支持搜索和按厂商筛选。
+  - 深链接：`?ips=1&ip=aws:ap-northeast-1`。
+  - 数据来自 `docs/atlas-targets.json`。
+- **5 套地球视觉方案**：浅色纸面（默认）、午夜蓝、城市夜光、蓝色弹珠、点阵，在左上角切换，也可以用 `?theme=light|midnight|night|marble|dots` 指定。
+- **URL 深链接**：`/?lat=31.23&lng=121.47&dc=aws:ap-northeast-1&tab=atlas`。
 
 ## 快速开始
 
@@ -27,6 +39,15 @@ npm run dev      # http://127.0.0.1:5173
 线上地址：https://global-network.nphunter.gg
 
 - **基础设施**：`infra/`（Pulumi TypeScript，项目 `nsite-infra`，stack `prod`），AWS 账号与 nphunter.gg 相同（`nphunter-sso` profile，us-east-1）。
+  - `/geo` 行为挂了 CloudFront Function `nsite-viewer-geo`（代码在 `infra/geo-function.js`）。它读取 CloudFront-Viewer-* 请求头，直接在边缘返回访问者的大致位置，不回源、不缓存。
+  - `/api/*` 转发到 Lambda `nsite-api`（代码在 `api/`）。
+    - 函数 URL 只允许这个 CloudFront 分发通过 OAC 调用；测量记录存在 DynamoDB 表 `nsite-measurements`；每天最多 50 次测量。
+    - 个人 RIPE Atlas API key 与站长 IP 白名单都是 Pulumi secret，设置方法：
+      ```bash
+      pulumi config set --secret ripeAtlasKey
+      pulumi config set --secret ownerIps <ip>
+      ```
+    - 站长 IP 变了之后，重新设置 `ownerIps` 并执行 `pulumi up` 即可。
   - 私有 S3 桶 `nsite-global-network`，经 CloudFront OAC 访问；
   - ACM 证书用 DNS 验证，Route 53 的 `nphunter.gg` 托管区里有 A/AAAA 别名记录；
   - GitHub OIDC 部署角色 `nsite-github-deploy`，只允许 `illidan53/nsite` 的 `main` 分支使用。
@@ -48,7 +69,8 @@ npm run dev      # http://127.0.0.1:5173
 
 ```
 scripts/build-data.ts     数据管线：下载 → 清洗 → 栅格化陆地 → 生成陆地骨干图 → 关联 RIPE Atlas 锚点
-scripts/extra-regions.ts  阿里云 / 腾讯云区域（上游数据集未收录）
+scripts/extra-regions.ts  腾讯云区域（上游数据集未收录）
+api/                      测量 API（Lambda）：/api/whoami、/api/measurements、/api/measure
 src/lib/geo.ts            大圆距离、插值、0.1° 陆地位图（浏览器和 Node 共用）
 src/lib/routing.ts        路径图构建、Dijkstra、分段与 RTT 估算
 src/lib/atlas.ts          RIPE Atlas / IPmap / RIPEstat 客户端
@@ -62,7 +84,8 @@ src/components/           GlobeView、Panel、RegionList、RouteEstimate、Route
 |---|---|---|---|
 | 海缆走向、登陆站、长度/运营方/投产年份 | [TeleGeography Submarine Cable Map](https://www.submarinecablemap.com/) 公开 JSON（`/api/v3/cable/cable-geo.json` 等） | **CC BY-NC-SA 3.0（禁止商用）** | 地球海缆图层、路径图的海底部分 |
 | 国家 / 省级边界、陆地、城市 | [Natural Earth](https://www.naturalearthdata.com/) | 公有领域 | 反查位置；陆地位图；陆地骨干的枢纽城市 |
-| 云区域坐标 | [jasonwilbur/mcp-server-cloud-regions](https://github.com/jasonwilbur/mcp-server-cloud-regions) + 手工补充的阿里云、腾讯云 | MIT | 数据中心点位 |
+| 云区域坐标 | [jasonwilbur/mcp-server-cloud-regions](https://github.com/jasonwilbur/mcp-server-cloud-regions)（AWS、Azure、GCP），加上按官方文档手工整理的腾讯云（`scripts/extra-regions.ts`） | MIT | 数据中心点位；坐标只到城市级（云厂商不公开机房的具体位置） |
+| 地球贴图 | NASA Blue Marble / Black Marble（随 three-globe 包分发） | 公有领域 | “城市夜光”“蓝色弹珠”视觉方案 |
 | 实测 traceroute / ping | [RIPE Atlas](https://atlas.ripe.net/) anchoring 测量 | RIPE Atlas 服务条款（数据公开） | 实测视图 |
 | 路由器地理定位 | [RIPE IPmap](https://ipmap.ripe.net/) | 同上 | 实测路径的逐跳位置 |
 | IP → ASN / 持有者 | [RIPEstat](https://stat.ripe.net/) | 同上 | 逐跳所属网络 |
@@ -74,8 +97,7 @@ src/components/           GlobeView、Panel、RegionList、RouteEstimate、Route
 ### 1. 真实路由（逐跳）：首选 RIPE Atlas
 
 - **Anchoring 测量（本项目已接入，无需 key）**：每个 RIPE Atlas 锚点每 15 分钟会被约 1,000 个其他锚点加约 400 个普通探针做一次 traceroute 和 ping，结果全部公开，浏览器可以直接跨域调用。
-  - 这些锚点里有不少就托管在云厂商机房内：Vultr 18 个、DigitalOcean 8 个、OVH 7 个、Linode 3 个、Hetzner 3 个、AWS 法兰克福 1 个。这类区域在界面上标为“同网实测”。
-  - 其余区域用 60 km 内的其他锚点作“同城参考”。307 个区域里有 233 个能拿到实测数据。
+  - AWS、Azure、GCP、腾讯云机房里几乎没有锚点（只有 AWS 法兰克福 1 个），所以大多数区域用 60 km 内的其他锚点作“同城参考”。174 个区域里有 122 个能拿到这类数据。
 - **AWS / Azure / GCP 本身几乎没有锚点。** 针对它们的公开测量大多是 CDN 的 anycast 地址（如 `d1.awsstatic.com`），不对应具体区域。要测某个具体区域，需要自己发起测量。
   - 你在运行 RIPE Atlas 探针（Mac 上的 #1017915 和 Zenlayer 利马的 #1017942），会持续获得积分，可以用来发起一次性 traceroute。
   - 后续可以加一个小后端：由后端持有 API key，从离点击位置最近的探针向区域公网端点发起测量，例如 `dynamodb.<region>.amazonaws.com`，或者自己在各区域部署的 VM。
@@ -97,6 +119,22 @@ src/components/           GlobeView、Panel、RegionList、RouteEstimate、Route
   - ITU BBMaps 需要申请；Infrapedia 可以在线浏览，数据下载需要商务合作。
   - OpenFiberMap / AfTerFibre / OFDS 只覆盖部分国家（以非洲为主）；OSM 的 telecom 标签很稀疏。
   - 因此本项目的陆地段用“沿陆地的大圆距离 × 1.4”近似，经过城市节点和登陆站。
+
+## 用自己的 RIPE Atlas 账号测具体区域
+
+[`docs/atlas-targets.json`](docs/atlas-targets.json) 里有 106 个区域的公开测量目标。这些目标于 2026-09-28 实测过 DNS、ICMP 和 TCP 443，而且都通过了光速校验：从新泽西测得的最小 RTT 不低于光纤直线传输的下限，排除了 anycast 和边缘节点。
+
+| 厂商 | 目标 | 测量方式 |
+|---|---|---|
+| AWS | `ec2.<region>.amazonaws.com`（中国区用 `.amazonaws.com.cn`） | 不回 ping，用 TCP traceroute，端口 443 |
+| Azure | azurespeed 项目的每区域存储账户 `s3<region>.blob.core.windows.net` | TCP 443；是第三方的账户，只做少量测量 |
+| 腾讯云 | `cos.<region>.myqcloud.com` | ping / traceroute |
+| GCP | **没有可用的公开目标**：区域服务都挂在 Google 前端的 anycast 地址上，实测 43 个里有 39 个落在最近的边缘节点。站长实测对 GCP 改用同城 RIPE Atlas 锚点代测，并在页面上注明 | 需要在该区域开一台 VM |
+
+发起测量时填域名，由探针端解析，不要写死 IP。积分消耗（[官方说明](https://atlas.ripe.net/docs/getting-started/credits)）：
+
+- 默认参数下，traceroute 每次结果 30 积分，ping 3 积分；一次性测量翻倍。
+- 每个在线探针每天约赚 21,600 积分。
 
 ## 估算模型
 

@@ -1,7 +1,7 @@
 // 下载并预处理站点所需的全部静态数据，输出到 public/data/。
 // 运行：npm run data（原始下载缓存在 .data-cache/，删除该目录即可强制刷新）。
 
-import { mkdir, readFile, writeFile, stat } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Feature, FeatureCollection, Geometry, Point, Polygon, MultiPolygon, Position } from 'geojson';
@@ -23,6 +23,7 @@ import type {
   NetworkData,
   ProviderId,
   Region,
+  TargetsData,
 } from '../src/lib/types.ts';
 import { EXTRA_REGIONS } from './extra-regions.ts';
 
@@ -460,6 +461,16 @@ async function main() {
   const landGraph = buildLandGraph(tnodes, land);
   log(`陆地图：节点 ${landGraph.nodes.length}，边 ${landGraph.edges.length}`);
 
+  // 地球贴图（NASA 影像，随 three-globe 包分发），供“城市夜光”“蓝色弹珠”等视觉方案使用。
+  const TEXTURES = ['earth-night.jpg', 'earth-blue-marble.jpg', 'earth-topology.png', 'night-sky.png'];
+  await mkdir(path.join(OUT, 'textures'), { recursive: true });
+  for (const f of TEXTURES) {
+    const local = path.join(ROOT, 'node_modules', 'three-globe', 'example', 'img', f);
+    const dest = path.join(OUT, 'textures', f);
+    if (await exists(local)) await copyFile(local, dest);
+    else await writeFile(dest, Buffer.from(await (await fetch(`https://cdn.jsdelivr.net/npm/three-globe/example/img/${f}`)).arrayBuffer()));
+  }
+
   const data: NetworkData = {
     regions,
     cables,
@@ -478,7 +489,16 @@ async function main() {
     },
   };
   await writeFile(path.join(OUT, 'network.json'), JSON.stringify(data));
-  for (const f of ['network.json', 'countries.topo.json', 'admin1.topo.json', 'landmask.bin']) {
+
+  // 公开测试目标：docs/atlas-targets.json（入库）附上区域坐标后给前端用。
+  const targets = JSON.parse(await readFile(path.join(ROOT, 'docs', 'atlas-targets.json'), 'utf8')) as TargetsData;
+  const regionById = new Map(regions.map((r) => [r.id, r]));
+  targets.targets = targets.targets
+    .filter((t) => regionById.has(t.region))
+    .map((t) => ({ ...t, lat: regionById.get(t.region)!.lat, lng: regionById.get(t.region)!.lng }));
+  await writeFile(path.join(OUT, 'targets.json'), JSON.stringify(targets));
+  log(`公开测试目标 ${targets.targets.length} 个`);
+  for (const f of ['network.json', 'targets.json', 'countries.topo.json', 'admin1.topo.json', 'landmask.bin']) {
     const s = await stat(path.join(OUT, f));
     log(`  ${f}: ${(s.size / 1024).toFixed(0)} KB`);
   }

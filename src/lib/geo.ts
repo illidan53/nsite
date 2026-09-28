@@ -126,3 +126,20 @@ export class LandMask {
     return true;
   }
 }
+
+/**
+ * 陆地上近似等面积分布的点（纬度每 stepDeg 一行，经度间距按 1/cos(纬度) 放大）。
+ * 用于“点阵”视觉方案。不含南极洲（贴在球体边缘时会糊成一圈）。
+ */
+export function landDots(mask: LandMask, stepDeg: number): { lat: number; lng: number }[] {
+  const dots: { lat: number; lng: number }[] = [];
+  for (let lat = -58; lat <= 84; lat += stepDeg) {
+    const step = stepDeg / Math.max(0.15, Math.cos(toRad(lat)));
+    const offset = (Math.round(lat / stepDeg) % 2) * step * 0.5;
+    for (let lng = -180 + offset; lng < 180; lng += step) {
+      if (mask.isLand(lng, lat)) dots.push({ lat, lng });
+    }
+  }
+  return dots;
+}
+

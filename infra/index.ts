@@ -2,6 +2,7 @@
 // 以及供 GitHub Actions 通过 OIDC 部署静态文件的 IAM 角色。
 // 本地执行：cd infra && npm ci && AWS_PROFILE=nphunter-sso pulumi up -s prod
 
+import { readFileSync } from "node:fs";
 import * as aws from "@pulumi/aws";
 import * as pulumi from "@pulumi/pulumi";
 
@@ -19,6 +20,10 @@ const githubSubjectPrefix = config.require("githubSubjectPrefix");
 if (!new RegExp(`^repo:${githubOwner}@\\d+/${githubRepo}@\\d+$`).test(githubSubjectPrefix)) {
   throw new Error("githubSubjectPrefix 必须是该仓库的不可变 OIDC 前缀，例如 repo:owner@123/repo@456");
 }
+// 站长专用的测量接口：个人 RIPE Atlas API key 与允许触发测量的来源 IP 都以 Pulumi secret 保存。
+const ripeAtlasKey = config.getSecret("ripeAtlasKey") ?? pulumi.secret("");
+const ownerIps = config.requireSecret("ownerIps");
+const dailyLimit = config.getNumber("dailyMeasurementLimit") ?? 50;
 const githubOidcProviderArn =
   config.get("githubOidcProviderArn") ??
   `arn:aws:iam::${accountId}:oidc-provider/token.actions.githubusercontent.com`;
@@ -27,7 +32,12 @@ const tags = { Service: "nsite", Name: "nsite-global-network" };
 
 // AWS 托管策略 ID
 const CACHING_OPTIMIZED = "658327ea-f89d-4fab-a63d-7e88639e58f6";
+const CACHING_DISABLED = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad";
 const SECURITY_HEADERS = "67f7725c-6f97-4210-82d7-5512b31e9d03";
+// 含全部 CloudFront-Viewer-* 地理定位请求头，CloudFront Function 才能读到它们。
+const ALL_VIEWER_AND_CLOUDFRONT_HEADERS = "33f36d7e-f396-46d9-90e0-52428a34d9dc";
+// 转发全部查看者请求头（Host 除外，函数 URL 需要自己的 Host）及 CloudFront-Viewer-Address。
+const ALL_VIEWER_EXCEPT_HOST = "b689b0a8-53d0-40ab-baf2-68738e2966ac";
 
 const zone = aws.route53.getZoneOutput({ name: zoneName, privateZone: false });
 
@@ -85,6 +95,85 @@ const oac = new aws.cloudfront.OriginAccessControl("siteOac", {
 });
 
 const originId = "s3-nsite-global-network";
+const apiOriginId = "lambda-nsite-api";
+
+// ---------------------------------------------------------------- 测量 API（Lambda + DynamoDB）
+
+const table = new aws.dynamodb.Table("measurements", {
+  name: "nsite-measurements",
+  billingMode: "PAY_PER_REQUEST",
+  hashKey: "pk",
+  rangeKey: "createdAt",
+  attributes: [
+    { name: "pk", type: "S" },
+    { name: "createdAt", type: "S" },
+  ],
+  tags,
+});
+
+const apiRole = new aws.iam.Role("apiRole", {
+  name: "nsite-api-lambda",
+  assumeRolePolicy: JSON.stringify({
+    Version: "2012-10-17",
+    Statement: [{ Effect: "Allow", Principal: { Service: "lambda.amazonaws.com" }, Action: "sts:AssumeRole" }],
+  }),
+  tags,
+});
+new aws.iam.RolePolicyAttachment("apiLogs", {
+  role: apiRole.name,
+  policyArn: aws.iam.ManagedPolicy.AWSLambdaBasicExecutionRole,
+});
+new aws.iam.RolePolicy("apiTable", {
+  role: apiRole.id,
+  policy: table.arn.apply((arn) =>
+    JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [{ Effect: "Allow", Action: ["dynamodb:PutItem", "dynamodb:Query", "dynamodb:UpdateItem"], Resource: arn }],
+    }),
+  ),
+});
+
+const api = new aws.lambda.Function("api", {
+  name: "nsite-api",
+  runtime: "nodejs22.x",
+  architectures: ["arm64"],
+  handler: "index.handler",
+  role: apiRole.arn,
+  timeout: 25,
+  memorySize: 256,
+  code: new pulumi.asset.AssetArchive({
+    "index.mjs": new pulumi.asset.FileAsset(new URL("../api/index.mjs", import.meta.url).pathname),
+    "owner.mjs": new pulumi.asset.FileAsset(new URL("../api/owner.mjs", import.meta.url).pathname),
+  }),
+  environment: {
+    variables: {
+      TABLE: table.name,
+      RIPE_ATLAS_KEY: ripeAtlasKey,
+      OWNER_IPS: ownerIps,
+      DAILY_LIMIT: String(dailyLimit),
+      SITE_ORIGIN: `https://${domain}`,
+    },
+  },
+  tags,
+});
+
+const apiUrl = new aws.lambda.FunctionUrl("apiUrl", { functionName: api.name, authorizationType: "AWS_IAM" });
+
+const apiOac = new aws.cloudfront.OriginAccessControl("apiOac", {
+  name: "nsite-api-oac",
+  originAccessControlOriginType: "lambda",
+  signingBehavior: "always",
+  signingProtocol: "sigv4",
+});
+
+// /geo：在边缘直接返回访问者的大致位置，供页面载入时拉近到所在地区。
+const geoFunction = new aws.cloudfront.Function("geoFunction", {
+  name: "nsite-viewer-geo",
+  runtime: "cloudfront-js-2.0",
+  comment: "Return the viewer's approximate location as JSON",
+  publish: true,
+  code: readFileSync(new URL("./geo-function.js", import.meta.url), "utf8"),
+});
 
 const distribution = new aws.cloudfront.Distribution("siteCdn", {
   enabled: true,
@@ -98,6 +187,42 @@ const distribution = new aws.cloudfront.Distribution("siteCdn", {
       domainName: bucket.bucketRegionalDomainName,
       originId,
       originAccessControlId: oac.id,
+    },
+    {
+      domainName: apiUrl.functionUrl.apply((u) => new URL(u).host),
+      originId: apiOriginId,
+      originAccessControlId: apiOac.id,
+      customOriginConfig: {
+        httpPort: 80,
+        httpsPort: 443,
+        originProtocolPolicy: "https-only",
+        originSslProtocols: ["TLSv1.2"],
+      },
+    },
+  ],
+  orderedCacheBehaviors: [
+    {
+      pathPattern: "/api/*",
+      targetOriginId: apiOriginId,
+      viewerProtocolPolicy: "https-only",
+      allowedMethods: ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"],
+      cachedMethods: ["GET", "HEAD"],
+      compress: true,
+      cachePolicyId: CACHING_DISABLED,
+      originRequestPolicyId: ALL_VIEWER_EXCEPT_HOST,
+      responseHeadersPolicyId: SECURITY_HEADERS,
+    },
+    {
+      pathPattern: "/geo",
+      targetOriginId: originId,
+      viewerProtocolPolicy: "redirect-to-https",
+      allowedMethods: ["GET", "HEAD"],
+      cachedMethods: ["GET", "HEAD"],
+      compress: false,
+      cachePolicyId: CACHING_DISABLED,
+      originRequestPolicyId: ALL_VIEWER_AND_CLOUDFRONT_HEADERS,
+      responseHeadersPolicyId: SECURITY_HEADERS,
+      functionAssociations: [{ eventType: "viewer-request", functionArn: geoFunction.arn }],
     },
   ],
   defaultCacheBehavior: {
@@ -137,6 +262,21 @@ new aws.s3.BucketPolicy("siteBucketPolicy", {
       ],
     }),
   ),
+});
+
+// 只允许本分发调用函数 URL（OAC 签名）。
+new aws.lambda.Permission("apiInvokeUrlFromCloudFront", {
+  action: "lambda:InvokeFunctionUrl",
+  function: api.name,
+  principal: "cloudfront.amazonaws.com",
+  sourceArn: distribution.arn,
+  functionUrlAuthType: "AWS_IAM",
+});
+new aws.lambda.Permission("apiInvokeFromCloudFront", {
+  action: "lambda:InvokeFunction",
+  function: api.name,
+  principal: "cloudfront.amazonaws.com",
+  sourceArn: distribution.arn,
 });
 
 for (const type of ["A", "AAAA"] as const) {
@@ -206,3 +346,5 @@ export const bucketId = bucket.id;
 export const distributionId = distribution.id;
 export const distributionDomain = distribution.domainName;
 export const deployRoleArn = deployRole.arn;
+export const apiFunction = api.name;
+export const measurementsTable = table.name;

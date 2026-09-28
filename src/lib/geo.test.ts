@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LandMask, greatCirclePoints, haversineKm, interpolateGreatCircle } from './geo.ts';
+import { LandMask, greatCirclePoints, haversineKm, interpolateGreatCircle, landDots } from './geo.ts';
 
 describe('haversineKm', () => {
   it('matches known city distances', () => {
@@ -54,3 +54,18 @@ describe('LandMask', () => {
     expect(mask.nearLand(15, 5, 30)).toBe(false);
   });
 });
+
+describe('landDots', () => {
+  const mask = new LandMask();
+  for (let row = 80 * LandMask.RES; row < 90 * LandMask.RES; row++) {
+    for (let col = 180 * LandMask.RES; col < 190 * LandMask.RES; col++) mask.set(row, col);
+  }
+
+  it('places dots only on land, roughly evenly spaced', () => {
+    const dots = landDots(mask, 1);
+    expect(dots.length).toBeGreaterThan(60);
+    expect(dots.length).toBeLessThan(140);
+    for (const d of dots) expect(mask.isLand(d.lng, d.lat)).toBe(true);
+  });
+});
+

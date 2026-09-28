@@ -1,0 +1,1923 @@
+{
+ "checkedAt": "2026-09-28",
+ "localCheck": {
+  "zh": "初次连通性检查（不是 RIPE Atlas）：2026-09-28 从美国新泽西州泽西城的一台机器实测 DNS、ICMP ping 与 TCP 443；只收录最小 RTT 不低于光纤直线下限的目标，排除 anycast/边缘节点。",
+  "en": "Initial reachability check (not RIPE Atlas): on 2026-09-28, DNS, ICMP ping and TCP 443 were tested from a machine in Jersey City, New Jersey; only targets whose minimum RTT is not below the straight-line fiber floor are kept, which rules out anycast/edge addresses."
+ },
+ "notes": [
+  "GCP 没有收录：区域服务都挂在 Google 前端的 anycast 地址上，ping/traceroute 只会到最近的 Google 边缘，要测具体区域需在该区域开一台 VM。",
+  "AWS 与 Azure 不响应 ICMP，请用 TCP traceroute（端口 443）；最后一跳的 RTT 就是到区域入口的时延。",
+  "Azure 目标是 azurespeed 项目自己的存储账户，只用于少量测量，别做高频探测。",
+  "目标地址会变，发起测量时用域名（RIPE Atlas 会在探针端解析），不要写死 IP。"
+ ],
+ "targets": [
+  {
+   "region": "aws:af-south-1",
+   "provider": "aws",
+   "city": "Cape Town",
+   "host": "ec2.af-south-1.amazonaws.com",
+   "ip": "13.246.244.212",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 231.7,
+    "floorMs": 123.1
+   }
+  },
+  {
+   "region": "aws:ap-east-1",
+   "provider": "aws",
+   "city": "Hong Kong",
+   "host": "ec2.ap-east-1.amazonaws.com",
+   "ip": "43.198.168.198",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 216.6,
+    "floorMs": 126.9
+   }
+  },
+  {
+   "region": "aws:ap-east-2",
+   "provider": "aws",
+   "city": "Taipei",
+   "host": "ec2.ap-east-2.amazonaws.com",
+   "ip": "43.213.168.148",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 205.5,
+    "floorMs": 122.7
+   }
+  },
+  {
+   "region": "aws:ap-northeast-1",
+   "provider": "aws",
+   "city": "Tokyo",
+   "host": "ec2.ap-northeast-1.amazonaws.com",
+   "ip": "52.195.203.150",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 177.7,
+    "floorMs": 106.3
+   }
+  },
+  {
+   "region": "aws:ap-northeast-2",
+   "provider": "aws",
+   "city": "Seoul",
+   "host": "ec2.ap-northeast-2.amazonaws.com",
+   "ip": "43.202.74.52",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 203.2,
+    "floorMs": 108.2
+   }
+  },
+  {
+   "region": "aws:ap-northeast-3",
+   "provider": "aws",
+   "city": "Osaka",
+   "host": "ec2.ap-northeast-3.amazonaws.com",
+   "ip": "15.168.98.183",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 180.0,
+    "floorMs": 108.7
+   }
+  },
+  {
+   "region": "aws:ap-south-1",
+   "provider": "aws",
+   "city": "Mumbai",
+   "host": "ec2.ap-south-1.amazonaws.com",
+   "ip": "13.200.93.194",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 261.9,
+    "floorMs": 122.8
+   }
+  },
+  {
+   "region": "aws:ap-south-2",
+   "provider": "aws",
+   "city": "Hyderabad",
+   "host": "ec2.ap-south-2.amazonaws.com",
+   "ip": "18.61.123.44",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 261.1,
+    "floorMs": 127.0
+   }
+  },
+  {
+   "region": "aws:ap-southeast-1",
+   "provider": "aws",
+   "city": "Singapore",
+   "host": "ec2.ap-southeast-1.amazonaws.com",
+   "ip": "47.128.7.25",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 252.5,
+    "floorMs": 150.2
+   }
+  },
+  {
+   "region": "aws:ap-southeast-2",
+   "provider": "aws",
+   "city": "Sydney",
+   "host": "ec2.ap-southeast-2.amazonaws.com",
+   "ip": "3.27.176.105",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 209.4,
+    "floorMs": 156.5
+   }
+  },
+  {
+   "region": "aws:ap-southeast-3",
+   "provider": "aws",
+   "city": "Jakarta",
+   "host": "ec2.ap-southeast-3.amazonaws.com",
+   "ip": "43.218.162.59",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 271.3,
+    "floorMs": 158.5
+   }
+  },
+  {
+   "region": "aws:ap-southeast-4",
+   "provider": "aws",
+   "city": "Melbourne",
+   "host": "ec2.ap-southeast-4.amazonaws.com",
+   "ip": "16.51.30.254",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 217.5,
+    "floorMs": 163.2
+   }
+  },
+  {
+   "region": "aws:ap-southeast-5",
+   "provider": "aws",
+   "city": "Kuala Lumpur",
+   "host": "ec2.ap-southeast-5.amazonaws.com",
+   "ip": "43.217.175.202",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 263.7,
+    "floorMs": 148.1
+   }
+  },
+  {
+   "region": "aws:ap-southeast-6",
+   "provider": "aws",
+   "city": "Auckland",
+   "host": "ec2.ap-southeast-6.amazonaws.com",
+   "ip": "3.103.82.118",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 238.7,
+    "floorMs": 139.0
+   }
+  },
+  {
+   "region": "aws:ap-southeast-7",
+   "provider": "aws",
+   "city": "Bangkok",
+   "host": "ec2.ap-southeast-7.amazonaws.com",
+   "ip": "43.208.76.86",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 281.2,
+    "floorMs": 136.5
+   }
+  },
+  {
+   "region": "aws:ca-central-1",
+   "provider": "aws",
+   "city": "Montreal",
+   "host": "ec2.ca-central-1.amazonaws.com",
+   "ip": "15.156.215.8",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 18.0,
+    "floorMs": 5.2
+   }
+  },
+  {
+   "region": "aws:ca-west-1",
+   "provider": "aws",
+   "city": "Calgary",
+   "host": "ec2.ca-west-1.amazonaws.com",
+   "ip": "40.177.53.231",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 74.5,
+    "floorMs": 31.9
+   }
+  },
+  {
+   "region": "aws:cn-north-1",
+   "provider": "aws",
+   "city": "Beijing",
+   "host": "ec2.cn-north-1.amazonaws.com.cn",
+   "ip": "43.196.18.37",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": null,
+    "floorMs": null
+   }
+  },
+  {
+   "region": "aws:cn-northwest-1",
+   "provider": "aws",
+   "city": "Ningxia",
+   "host": "ec2.cn-northwest-1.amazonaws.com.cn",
+   "ip": "43.192.163.213",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": null,
+    "floorMs": null
+   }
+  },
+  {
+   "region": "aws:eu-central-1",
+   "provider": "aws",
+   "city": "Frankfurt",
+   "host": "ec2.eu-central-1.amazonaws.com",
+   "ip": "3.78.203.161",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 98.2,
+    "floorMs": 60.8
+   }
+  },
+  {
+   "region": "aws:eu-central-2",
+   "provider": "aws",
+   "city": "Zurich",
+   "host": "ec2.eu-central-2.amazonaws.com",
+   "ip": "16.63.91.82",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 101.7,
+    "floorMs": 62.0
+   }
+  },
+  {
+   "region": "aws:eu-north-1",
+   "provider": "aws",
+   "city": "Stockholm",
+   "host": "ec2.eu-north-1.amazonaws.com",
+   "ip": "16.171.83.229",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 100.0,
+    "floorMs": 61.9
+   }
+  },
+  {
+   "region": "aws:eu-south-1",
+   "provider": "aws",
+   "city": "Milan",
+   "host": "ec2.eu-south-1.amazonaws.com",
+   "ip": "18.102.162.161",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 103.5,
+    "floorMs": 63.4
+   }
+  },
+  {
+   "region": "aws:eu-south-2",
+   "provider": "aws",
+   "city": "Aragón",
+   "host": "ec2.eu-south-2.amazonaws.com",
+   "ip": "18.101.85.247",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 113.1,
+    "floorMs": 58.1
+   }
+  },
+  {
+   "region": "aws:eu-west-1",
+   "provider": "aws",
+   "city": "Dublin",
+   "host": "ec2.eu-west-1.amazonaws.com",
+   "ip": "3.253.218.7",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 93.7,
+    "floorMs": 50.2
+   }
+  },
+  {
+   "region": "aws:eu-west-2",
+   "provider": "aws",
+   "city": "London",
+   "host": "ec2.eu-west-2.amazonaws.com",
+   "ip": "13.43.47.100",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 81.9,
+    "floorMs": 54.6
+   }
+  },
+  {
+   "region": "aws:eu-west-3",
+   "provider": "aws",
+   "city": "Paris",
+   "host": "ec2.eu-west-3.amazonaws.com",
+   "ip": "13.39.221.221",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 84.8,
+    "floorMs": 57.2
+   }
+  },
+  {
+   "region": "aws:il-central-1",
+   "provider": "aws",
+   "city": "Tel Aviv",
+   "host": "ec2.il-central-1.amazonaws.com",
+   "ip": "51.16.104.246",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 153.2,
+    "floorMs": 89.3
+   }
+  },
+  {
+   "region": "aws:me-central-1",
+   "provider": "aws",
+   "city": "Dubai",
+   "host": "ec2.me-central-1.amazonaws.com",
+   "ip": "3.28.72.55",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 205.5,
+    "floorMs": 107.9
+   }
+  },
+  {
+   "region": "aws:mx-central-1",
+   "provider": "aws",
+   "city": "Querétaro",
+   "host": "ec2.mx-central-1.amazonaws.com",
+   "ip": "78.13.89.3",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 68.8,
+    "floorMs": 32.7
+   }
+  },
+  {
+   "region": "aws:sa-east-1",
+   "provider": "aws",
+   "city": "São Paulo",
+   "host": "ec2.sa-east-1.amazonaws.com",
+   "ip": "15.229.200.84",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 133.2,
+    "floorMs": 75.3
+   }
+  },
+  {
+   "region": "aws:us-east-1",
+   "provider": "aws",
+   "city": "Ashburn",
+   "host": "ec2.us-east-1.amazonaws.com",
+   "ip": "44.213.79.193",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 14.6,
+    "floorMs": 3.4
+   }
+  },
+  {
+   "region": "aws:us-east-2",
+   "provider": "aws",
+   "city": "Columbus",
+   "host": "ec2.us-east-2.amazonaws.com",
+   "ip": "3.146.8.13",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 23.4,
+    "floorMs": 7.4
+   }
+  },
+  {
+   "region": "aws:us-gov-east-1",
+   "provider": "aws",
+   "city": "Eastern US",
+   "host": "ec2.us-gov-east-1.amazonaws.com",
+   "ip": "16.64.37.153",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 27.3,
+    "floorMs": 3.1
+   }
+  },
+  {
+   "region": "aws:us-gov-west-1",
+   "provider": "aws",
+   "city": "Pacific Northwest",
+   "host": "ec2.us-gov-west-1.amazonaws.com",
+   "ip": "56.136.225.186",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 78.0,
+    "floorMs": 35.7
+   }
+  },
+  {
+   "region": "aws:us-west-1",
+   "provider": "aws",
+   "city": "San Francisco",
+   "host": "ec2.us-west-1.amazonaws.com",
+   "ip": "3.101.233.116",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 67.9,
+    "floorMs": 40.4
+   }
+  },
+  {
+   "region": "aws:us-west-2",
+   "provider": "aws",
+   "city": "Portland",
+   "host": "ec2.us-west-2.amazonaws.com",
+   "ip": "44.254.14.174",
+   "method": "tcp443",
+   "source": {
+    "zh": "AWS EC2 区域 API 端点",
+    "en": "AWS EC2 regional API endpoint",
+    "url": "https://docs.aws.amazon.com/general/latest/gr/ec2-service.html"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 71.0,
+    "floorMs": 38.4
+   }
+  },
+  {
+   "region": "azure:australiacentral",
+   "provider": "azure",
+   "city": "Canberra",
+   "host": "s3australiacentral.blob.core.windows.net",
+   "ip": "20.60.102.1",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 204.4,
+    "floorMs": 158.9
+   }
+  },
+  {
+   "region": "azure:australiaeast",
+   "provider": "azure",
+   "city": "Sydney",
+   "host": "s3australiaeast.blob.core.windows.net",
+   "ip": "20.60.183.225",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 203.5,
+    "floorMs": 156.5
+   }
+  },
+  {
+   "region": "azure:australiasoutheast",
+   "provider": "azure",
+   "city": "Melbourne",
+   "host": "s3australiasoutheast.blob.core.windows.net",
+   "ip": "20.150.119.11",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 216.1,
+    "floorMs": 163.2
+   }
+  },
+  {
+   "region": "azure:austriaeast",
+   "provider": "azure",
+   "city": "Vienna",
+   "host": "s3austriaeast.blob.core.windows.net",
+   "ip": "57.150.117.19",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 103.7,
+    "floorMs": 66.6
+   }
+  },
+  {
+   "region": "azure:belgiumcentral",
+   "provider": "azure",
+   "city": "Brussels",
+   "host": "s3belgiumcentral.blob.core.windows.net",
+   "ip": "57.150.196.51",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 91.7,
+    "floorMs": 57.7
+   }
+  },
+  {
+   "region": "azure:brazilsouth",
+   "provider": "azure",
+   "city": "São Paulo",
+   "host": "s3brazilsouth.blob.core.windows.net",
+   "ip": "20.60.36.65",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 129.8,
+    "floorMs": 75.3
+   }
+  },
+  {
+   "region": "azure:canadacentral",
+   "provider": "azure",
+   "city": "Toronto",
+   "host": "s3canadacentral.blob.core.windows.net",
+   "ip": "20.60.242.11",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 28.1,
+    "floorMs": 5.3
+   }
+  },
+  {
+   "region": "azure:canadaeast",
+   "provider": "azure",
+   "city": "Quebec City",
+   "host": "s3canadaeast.blob.core.windows.net",
+   "ip": "20.150.1.97",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 26.0,
+    "floorMs": 7.0
+   }
+  },
+  {
+   "region": "azure:centralindia",
+   "provider": "azure",
+   "city": "Pune",
+   "host": "s3centralindia.blob.core.windows.net",
+   "ip": "20.38.127.4",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 186.2,
+    "floorMs": 123.8
+   }
+  },
+  {
+   "region": "azure:centralus",
+   "provider": "azure",
+   "city": "Iowa",
+   "host": "s3centralus.blob.core.windows.net",
+   "ip": "20.60.240.168",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 34.2,
+    "floorMs": 16.0
+   }
+  },
+  {
+   "region": "azure:chilecentral",
+   "provider": "azure",
+   "city": "Santiago",
+   "host": "s3chilecentral.blob.core.windows.net",
+   "ip": "57.150.101.33",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 123.7,
+    "floorMs": 80.8
+   }
+  },
+  {
+   "region": "azure:denmarkeast",
+   "provider": "azure",
+   "city": "Copenhagen",
+   "host": "s3denmarkeast.blob.core.windows.net",
+   "ip": "57.150.199.36",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 85.7,
+    "floorMs": 60.7
+   }
+  },
+  {
+   "region": "azure:eastasia",
+   "provider": "azure",
+   "city": "Hong Kong",
+   "host": "s3eastasia.blob.core.windows.net",
+   "ip": "20.60.131.228",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 209.7,
+    "floorMs": 126.9
+   }
+  },
+  {
+   "region": "azure:eastus",
+   "provider": "azure",
+   "city": "Virginia",
+   "host": "s3eastus.blob.core.windows.net",
+   "ip": "135.130.108.129",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 13.3,
+    "floorMs": 6.1
+   }
+  },
+  {
+   "region": "azure:eastus2",
+   "provider": "azure",
+   "city": "Virginia",
+   "host": "s3eastus2.blob.core.windows.net",
+   "ip": "20.209.69.193",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 17.6,
+    "floorMs": 5.7
+   }
+  },
+  {
+   "region": "azure:francecentral",
+   "provider": "azure",
+   "city": "Paris",
+   "host": "s3francecentral.blob.core.windows.net",
+   "ip": "20.209.215.1",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 84.3,
+    "floorMs": 58.3
+   }
+  },
+  {
+   "region": "azure:germanywestcentral",
+   "provider": "azure",
+   "city": "Frankfurt",
+   "host": "s3germanywestcentral.blob.core.windows.net",
+   "ip": "20.150.125.193",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 91.9,
+    "floorMs": 60.8
+   }
+  },
+  {
+   "region": "azure:indonesiacentral",
+   "provider": "azure",
+   "city": "Jakarta",
+   "host": "s3indonesiacentral.blob.core.windows.net",
+   "ip": "20.60.124.147",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 233.4,
+    "floorMs": 158.5
+   }
+  },
+  {
+   "region": "azure:israelcentral",
+   "provider": "azure",
+   "city": "Tel Aviv",
+   "host": "s3israelcentral.blob.core.windows.net",
+   "ip": "20.209.119.33",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 119.9,
+    "floorMs": 89.3
+   }
+  },
+  {
+   "region": "azure:italynorth",
+   "provider": "azure",
+   "city": "Milan",
+   "host": "s3italynorth.blob.core.windows.net",
+   "ip": "20.209.87.193",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 97.3,
+    "floorMs": 63.4
+   }
+  },
+  {
+   "region": "azure:japaneast",
+   "provider": "azure",
+   "city": "Tokyo",
+   "host": "s3japaneast.blob.core.windows.net",
+   "ip": "20.60.248.65",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 166.0,
+    "floorMs": 106.2
+   }
+  },
+  {
+   "region": "azure:japanwest",
+   "provider": "azure",
+   "city": "Osaka",
+   "host": "s3japanwest.blob.core.windows.net",
+   "ip": "20.60.118.33",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 170.7,
+    "floorMs": 108.7
+   }
+  },
+  {
+   "region": "azure:koreacentral",
+   "provider": "azure",
+   "city": "Seoul",
+   "host": "s3koreacentral.blob.core.windows.net",
+   "ip": "20.150.4.36",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 190.4,
+    "floorMs": 108.2
+   }
+  },
+  {
+   "region": "azure:koreasouth",
+   "provider": "azure",
+   "city": "Busan",
+   "host": "s3koreasouth.blob.core.windows.net",
+   "ip": "20.60.202.5",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 181.4,
+    "floorMs": 110.2
+   }
+  },
+  {
+   "region": "azure:malaysiawest",
+   "provider": "azure",
+   "city": "Kuala Lumpur",
+   "host": "s3malaysiawest.blob.core.windows.net",
+   "ip": "20.60.103.243",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 225.3,
+    "floorMs": 148.1
+   }
+  },
+  {
+   "region": "azure:mexicocentral",
+   "provider": "azure",
+   "city": "Querétaro",
+   "host": "s3mexicocentral.blob.core.windows.net",
+   "ip": "20.60.97.1",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 67.8,
+    "floorMs": 32.7
+   }
+  },
+  {
+   "region": "azure:newzealandnorth",
+   "provider": "azure",
+   "city": "Auckland",
+   "host": "s3newzealandnorth.blob.core.windows.net",
+   "ip": "20.60.116.235",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 187.3,
+    "floorMs": 139.0
+   }
+  },
+  {
+   "region": "azure:northcentralus",
+   "provider": "azure",
+   "city": "Illinois",
+   "host": "s3northcentralus.blob.core.windows.net",
+   "ip": "20.60.29.161",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 24.3,
+    "floorMs": 11.1
+   }
+  },
+  {
+   "region": "azure:northeurope",
+   "provider": "azure",
+   "city": "Dublin",
+   "host": "s3northeurope.blob.core.windows.net",
+   "ip": "57.150.165.193",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 71.7,
+    "floorMs": 50.2
+   }
+  },
+  {
+   "region": "azure:norwayeast",
+   "provider": "azure",
+   "city": "Oslo",
+   "host": "s3norwayeast.blob.core.windows.net",
+   "ip": "20.150.121.132",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 95.1,
+    "floorMs": 58.0
+   }
+  },
+  {
+   "region": "azure:polandcentral",
+   "provider": "azure",
+   "city": "Warsaw",
+   "host": "s3polandcentral.blob.core.windows.net",
+   "ip": "20.209.60.193",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 98.9,
+    "floorMs": 67.2
+   }
+  },
+  {
+   "region": "azure:qatarcentral",
+   "provider": "azure",
+   "city": "Doha",
+   "host": "s3qatarcentral.blob.core.windows.net",
+   "ip": "20.209.3.193",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 154.4,
+    "floorMs": 105.6
+   }
+  },
+  {
+   "region": "azure:southafricanorth",
+   "provider": "azure",
+   "city": "Johannesburg",
+   "host": "s3southafricanorth.blob.core.windows.net",
+   "ip": "20.150.62.193",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 225.8,
+    "floorMs": 125.8
+   }
+  },
+  {
+   "region": "azure:southcentralus",
+   "provider": "azure",
+   "city": "Texas",
+   "host": "s3southcentralus.blob.core.windows.net",
+   "ip": "20.60.161.1",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 47.6,
+    "floorMs": 24.9
+   }
+  },
+  {
+   "region": "azure:southeastasia",
+   "provider": "azure",
+   "city": "Singapore",
+   "host": "s3southeastasia.blob.core.windows.net",
+   "ip": "20.150.127.11",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 227.3,
+    "floorMs": 150.3
+   }
+  },
+  {
+   "region": "azure:southindia",
+   "provider": "azure",
+   "city": "Chennai",
+   "host": "s3southindia.blob.core.windows.net",
+   "ip": "20.150.24.225",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 203.3,
+    "floorMs": 132.0
+   }
+  },
+  {
+   "region": "azure:spaincentral",
+   "provider": "azure",
+   "city": "Madrid",
+   "host": "s3spaincentral.blob.core.windows.net",
+   "ip": "20.60.109.225",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 86.4,
+    "floorMs": 56.6
+   }
+  },
+  {
+   "region": "azure:swedencentral",
+   "provider": "azure",
+   "city": "Gävle",
+   "host": "s3swedencentral.blob.core.windows.net",
+   "ip": "20.150.44.36",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 98.1,
+    "floorMs": 60.9
+   }
+  },
+  {
+   "region": "azure:switzerlandnorth",
+   "provider": "azure",
+   "city": "Zurich",
+   "host": "s3switzerlandnorth.blob.core.windows.net",
+   "ip": "52.239.251.228",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 95.4,
+    "floorMs": 62.0
+   }
+  },
+  {
+   "region": "azure:uaenorth",
+   "provider": "azure",
+   "city": "Dubai",
+   "host": "s3uaenorth.blob.core.windows.net",
+   "ip": "20.60.213.65",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 166.4,
+    "floorMs": 107.8
+   }
+  },
+  {
+   "region": "azure:uksouth",
+   "provider": "azure",
+   "city": "London",
+   "host": "s3uksouth.blob.core.windows.net",
+   "ip": "20.209.129.193",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 77.2,
+    "floorMs": 54.4
+   }
+  },
+  {
+   "region": "azure:ukwest",
+   "provider": "azure",
+   "city": "Cardiff",
+   "host": "s3ukwest.blob.core.windows.net",
+   "ip": "20.150.52.161",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 80.9,
+    "floorMs": 52.6
+   }
+  },
+  {
+   "region": "azure:westcentralus",
+   "provider": "azure",
+   "city": "Wyoming",
+   "host": "s3westcentralus.blob.core.windows.net",
+   "ip": "20.60.122.163",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 48.2,
+    "floorMs": 29.6
+   }
+  },
+  {
+   "region": "azure:westeurope",
+   "provider": "azure",
+   "city": "Amsterdam",
+   "host": "s3westeurope.blob.core.windows.net",
+   "ip": "20.209.73.130",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 82.2,
+    "floorMs": 57.5
+   }
+  },
+  {
+   "region": "azure:westindia",
+   "provider": "azure",
+   "city": "Mumbai",
+   "host": "s3westindia.blob.core.windows.net",
+   "ip": "20.150.43.97",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 180.9,
+    "floorMs": 122.8
+   }
+  },
+  {
+   "region": "azure:westus",
+   "provider": "azure",
+   "city": "California",
+   "host": "s3westus.blob.core.windows.net",
+   "ip": "20.209.102.161",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 72.2,
+    "floorMs": 40.4
+   }
+  },
+  {
+   "region": "azure:westus2",
+   "provider": "azure",
+   "city": "Washington",
+   "host": "s3westus2.blob.core.windows.net",
+   "ip": "57.150.149.97",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 72.2,
+    "floorMs": 36.0
+   }
+  },
+  {
+   "region": "azure:westus3",
+   "provider": "azure",
+   "city": "Arizona",
+   "host": "s3westus3.blob.core.windows.net",
+   "ip": "20.150.30.100",
+   "method": "tcp443",
+   "source": {
+    "zh": "azurespeed 项目的区域测速存储账户（第三方）",
+    "en": "azurespeed per-region test storage account (third party)",
+    "url": "https://github.com/blrchen/azurespeed"
+   },
+   "localCheck": {
+    "icmpMs": null,
+    "tcpMs": 67.1,
+    "floorMs": 33.7
+   }
+  },
+  {
+   "region": "tencent:ap-bangkok",
+   "provider": "tencent",
+   "city": "Bangkok",
+   "host": "cos.ap-bangkok.myqcloud.com",
+   "ip": "150.109.165.181",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 279.7,
+    "tcpMs": 270.1,
+    "floorMs": 136.5
+   }
+  },
+  {
+   "region": "tencent:ap-beijing",
+   "provider": "tencent",
+   "city": "Beijing",
+   "host": "cos.ap-beijing.myqcloud.com",
+   "ip": "82.156.94.13",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 225.4,
+    "tcpMs": 232.9,
+    "floorMs": 107.6
+   }
+  },
+  {
+   "region": "tencent:ap-chengdu",
+   "provider": "tencent",
+   "city": "Chengdu",
+   "host": "cos.ap-chengdu.myqcloud.com",
+   "ip": "183.66.100.32",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 246.6,
+    "tcpMs": 251.2,
+    "floorMs": 118.4
+   }
+  },
+  {
+   "region": "tencent:ap-chongqing",
+   "provider": "tencent",
+   "city": "Chongqing",
+   "host": "cos.ap-chongqing.myqcloud.com",
+   "ip": "183.66.100.51",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 238.2,
+    "tcpMs": 240.2,
+    "floorMs": 119.5
+   }
+  },
+  {
+   "region": "tencent:ap-guangzhou",
+   "provider": "tencent",
+   "city": "Guangzhou",
+   "host": "cos.ap-guangzhou.myqcloud.com",
+   "ip": "159.75.57.118",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 224.4,
+    "tcpMs": 228.0,
+    "floorMs": 126.1
+   }
+  },
+  {
+   "region": "tencent:ap-hongkong",
+   "provider": "tencent",
+   "city": "Hong Kong",
+   "host": "cos.ap-hongkong.myqcloud.com",
+   "ip": "43.132.105.206",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 233.0,
+    "tcpMs": 232.7,
+    "floorMs": 126.9
+   }
+  },
+  {
+   "region": "tencent:ap-jakarta",
+   "provider": "tencent",
+   "city": "Jakarta",
+   "host": "cos.ap-jakarta.myqcloud.com",
+   "ip": "43.173.31.137",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 254.5,
+    "tcpMs": 256.4,
+    "floorMs": 158.5
+   }
+  },
+  {
+   "region": "tencent:ap-johorbahru",
+   "provider": "tencent",
+   "city": "Johor Bahru",
+   "host": "cos.ap-johorbahru.myqcloud.com",
+   "ip": "43.173.145.46",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 238.5,
+    "tcpMs": 238.6,
+    "floorMs": 150.0
+   }
+  },
+  {
+   "region": "tencent:ap-nanjing",
+   "provider": "tencent",
+   "city": "Nanjing",
+   "host": "cos.ap-nanjing.myqcloud.com",
+   "ip": "119.45.110.19",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 214.8,
+    "tcpMs": 231.6,
+    "floorMs": 115.7
+   }
+  },
+  {
+   "region": "tencent:ap-osaka",
+   "provider": "tencent",
+   "city": "Osaka",
+   "host": "cos.ap-osaka.myqcloud.com",
+   "ip": "43.172.132.18",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 181.8,
+    "tcpMs": 180.3,
+    "floorMs": 108.7
+   }
+  },
+  {
+   "region": "tencent:ap-seoul",
+   "provider": "tencent",
+   "city": "Seoul",
+   "host": "cos.ap-seoul.myqcloud.com",
+   "ip": "119.28.146.206",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 197.9,
+    "tcpMs": 195.0,
+    "floorMs": 108.2
+   }
+  },
+  {
+   "region": "tencent:ap-shanghai",
+   "provider": "tencent",
+   "city": "Shanghai",
+   "host": "cos.ap-shanghai.myqcloud.com",
+   "ip": "117.68.20.85",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 215.6,
+    "tcpMs": 301.0,
+    "floorMs": 116.1
+   }
+  },
+  {
+   "region": "tencent:ap-singapore",
+   "provider": "tencent",
+   "city": "Singapore",
+   "host": "cos.ap-singapore.myqcloud.com",
+   "ip": "43.153.232.152",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 247.5,
+    "tcpMs": 236.0,
+    "floorMs": 150.2
+   }
+  },
+  {
+   "region": "tencent:ap-tokyo",
+   "provider": "tencent",
+   "city": "Tokyo",
+   "host": "cos.ap-tokyo.myqcloud.com",
+   "ip": "43.128.240.50",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 166.1,
+    "tcpMs": 174.1,
+    "floorMs": 106.3
+   }
+  },
+  {
+   "region": "tencent:ap-zhongwei",
+   "provider": "tencent",
+   "city": "Zhongwei",
+   "host": "cos.ap-zhongwei.myqcloud.com",
+   "ip": "106.119.171.63",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 234.3,
+    "tcpMs": 246.8,
+    "floorMs": 110.9
+   }
+  },
+  {
+   "region": "tencent:eu-frankfurt",
+   "provider": "tencent",
+   "city": "Frankfurt",
+   "host": "cos.eu-frankfurt.myqcloud.com",
+   "ip": "43.158.112.41",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 97.4,
+    "tcpMs": 96.7,
+    "floorMs": 60.8
+   }
+  },
+  {
+   "region": "tencent:me-saudi-arabia",
+   "provider": "tencent",
+   "city": "Riyadh",
+   "host": "cos.me-saudi-arabia.myqcloud.com",
+   "ip": "43.164.67.9",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 161.2,
+    "tcpMs": 161.4,
+    "floorMs": 103.0
+   }
+  },
+  {
+   "region": "tencent:na-ashburn",
+   "provider": "tencent",
+   "city": "Ashburn",
+   "host": "cos.na-ashburn.myqcloud.com",
+   "ip": "49.51.78.226",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 19.9,
+    "tcpMs": 14.4,
+    "floorMs": 3.4
+   }
+  },
+  {
+   "region": "tencent:na-queretaro",
+   "provider": "tencent",
+   "city": "Querétaro",
+   "host": "cos.na-queretaro.myqcloud.com",
+   "ip": "161.120.134.198",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 69.7,
+    "tcpMs": 69.4,
+    "floorMs": 32.7
+   }
+  },
+  {
+   "region": "tencent:na-siliconvalley",
+   "provider": "tencent",
+   "city": "Santa Clara",
+   "host": "cos.na-siliconvalley.myqcloud.com",
+   "ip": "170.106.97.185",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 71.4,
+    "tcpMs": 70.5,
+    "floorMs": 40.2
+   }
+  },
+  {
+   "region": "tencent:sa-saopaulo",
+   "provider": "tencent",
+   "city": "São Paulo",
+   "host": "cos.sa-saopaulo.myqcloud.com",
+   "ip": "43.157.145.234",
+   "method": "icmp",
+   "source": {
+    "zh": "腾讯云 COS 区域端点",
+    "en": "Tencent Cloud COS regional endpoint",
+    "url": "https://www.tencentcloud.com/document/product/436/6224"
+   },
+   "localCheck": {
+    "icmpMs": 130.0,
+    "tcpMs": 130.0,
+    "floorMs": 75.3
+   }
+  }
+ ]
+}

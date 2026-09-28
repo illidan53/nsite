@@ -15,7 +15,31 @@
   --danger: #f87171;
   --radius: 10px;
   --panel-width: 440px;
+  --chip-bg: rgba(9, 14, 25, 0.7);
+  --tip-bg: rgba(9, 14, 25, 0.95);
+  --input-bg: rgba(255, 255, 255, 0.05);
   color-scheme: dark;
+}
+
+/* “浅色纸面”视觉方案下的界面配色 */
+:root[data-ui='light'] {
+  --bg: #e8edf4;
+  --panel: rgba(255, 255, 255, 0.92);
+  --panel-solid: #ffffff;
+  --raised: rgba(15, 23, 42, 0.04);
+  --raised-hover: rgba(15, 23, 42, 0.08);
+  --border: rgba(15, 23, 42, 0.12);
+  --text: #0f172a;
+  --muted: #475569;
+  --faint: #94a3b8;
+  --sub: #0369a1;
+  --land: #c2410c;
+  --live: #047857;
+  --proxy: #6d28d9;
+  --chip-bg: rgba(255, 255, 255, 0.8);
+  --tip-bg: rgba(255, 255, 255, 0.97);
+  --input-bg: rgba(255, 255, 255, 0.9);
+  color-scheme: light;
 }
 
 * {
@@ -125,6 +149,94 @@ button {
   font-size: 13px;
 }
 
+/* “公开测试 IP”入口 */
+.ips-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: -4px 0 12px;
+  padding: 5px 12px 5px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--sub) 45%, transparent);
+  background: color-mix(in srgb, var(--sub) 10%, var(--chip-bg));
+  color: var(--sub);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ips-link:hover,
+.ips-link-on {
+  background: color-mix(in srgb, var(--sub) 20%, var(--chip-bg));
+}
+.ips-icon {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  box-shadow: inset 0 0 0 2px var(--chip-bg), inset 0 0 0 4px currentColor;
+}
+
+/* 语言与视觉切换 */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--chip-bg);
+}
+.segmented button {
+  border: none;
+  background: none;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.segmented .seg-on {
+  background: var(--sub);
+  color: #fff;
+}
+.theme-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.theme-select select {
+  font: inherit;
+  color: var(--text);
+  background: var(--chip-bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.you-hint {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -6px 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.you-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.25);
+}
+
 .layer-toggles {
   display: flex;
   gap: 14px;
@@ -155,7 +267,7 @@ button {
   padding: 3px 10px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: rgba(9, 14, 25, 0.7);
+  background: var(--chip-bg);
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
@@ -201,7 +313,7 @@ button {
   padding: 0 !important;
 }
 .tip {
-  background: rgba(9, 14, 25, 0.95);
+  background: var(--tip-bg);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 6px 10px;
@@ -242,6 +354,13 @@ button {
   background: transparent;
   border: 2px solid #fff;
   box-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
+}
+.marker-you {
+  width: 12px;
+  height: 12px;
+  background: #34d399;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 6px rgba(52, 211, 153, 0.25), 0 0 16px rgba(52, 211, 153, 0.6);
 }
 .marker-waypoint {
   width: 7px;
@@ -321,19 +440,6 @@ button {
   flex: 1;
 }
 
-.section-title {
-  font-size: 14px;
-  font-weight: 600;
-  margin: 2px 0 10px;
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-.section-title .muted {
-  font-size: 12px;
-  font-weight: 400;
-}
-
 .link-button {
   background: none;
   border: none;
@@ -351,6 +457,189 @@ button {
 }
 .link-button.back {
   padding-top: 0;
+}
+
+/* 可展开 / 收起的段 */
+
+.section + .section {
+  margin-top: 8px;
+}
+.section-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 2px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+.section-head:hover .section-title {
+  color: var(--sub);
+}
+.section-chevron {
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform 0.2s;
+  flex: none;
+}
+.section-open .section-chevron {
+  transform: rotate(45deg) translate(-2px, -2px);
+}
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  flex: 1;
+}
+.section-aside {
+  font-size: 12px;
+}
+.section-body {
+  padding-top: 10px;
+}
+
+/* 任选数据中心 */
+
+.picker-search {
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+.picker-search:focus {
+  outline: 2px solid var(--sub);
+  outline-offset: -1px;
+}
+.picker-providers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+.picker-group + .picker-group {
+  margin-top: 12px;
+}
+.picker-group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0 0 6px 2px;
+}
+
+/* 站长实测 */
+
+.callout-strong {
+  border-color: color-mix(in srgb, var(--land) 45%, transparent);
+  border-left-color: var(--land);
+  background: color-mix(in srgb, var(--land) 9%, transparent);
+}
+.callout-strong b {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--land);
+}
+.callout-strong p {
+  font-size: 12.5px;
+  color: var(--text);
+}
+.mine-target {
+  font-size: 13px;
+  margin: 0 0 10px;
+  overflow-wrap: anywhere;
+}
+.mine-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.primary-button {
+  border: none;
+  border-radius: 999px;
+  padding: 7px 16px;
+  background: var(--sub);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+.primary-button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.mine-meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 4px 0 8px;
+}
+
+/* 公开测试 IP 面板 */
+
+.callout {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--sub);
+  border-radius: var(--radius);
+  background: var(--raised);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+.callout p {
+  margin: 0 0 6px;
+}
+.callout p:last-child {
+  margin-bottom: 0;
+}
+.ip-row .region-sub {
+  font-size: 11.5px;
+}
+.ip-fields {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 10px 12px;
+  margin: 4px 0 14px;
+  font-size: 13px;
+}
+.ip-fields dt {
+  color: var(--muted);
+  font-size: 12px;
+  padding-top: 2px;
+}
+.ip-fields dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ip-value {
+  font-size: 15px;
+  font-weight: 700;
+}
+.copy-button {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--raised);
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  vertical-align: 1px;
+}
+.copy-button:hover {
+  background: var(--raised-hover);
+  color: var(--text);
 }
 
 /* 数据中心列表 */
@@ -475,6 +764,9 @@ button {
   cursor: pointer;
   color: var(--muted);
   font-size: 13px;
+}
+.tabs-3 {
+  grid-template-columns: 1fr 1fr 1fr;
 }
 .tabs .tab-on {
   background: rgba(56, 189, 248, 0.14);

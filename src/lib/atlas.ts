@@ -173,6 +173,8 @@ export interface NearbyTrace {
   trace: TraceResult;
 }
 
+export type SearchProgress = { stage: 'probes'; radius: number } | { stage: 'traces'; count: number; target: string };
+
 /**
  * 在锚点的 anchoring 测量里找离 (lat, lng) 最近的发起探针。
  * anchoring mesh 测量由全部锚点发起，anchoring probes 测量由约 400 个普通探针发起，
@@ -184,10 +186,10 @@ export async function findNearbyTraces(
   lng: number,
   anchorProbes: AnchorProbe[],
   signal?: AbortSignal,
-  onProgress?: (msg: string) => void,
+  onProgress?: (p: SearchProgress) => void,
 ): Promise<NearbyTrace[]> {
   for (const radius of [500, 1500, 4000]) {
-    onProgress?.(`查找 ${radius} km 内的 RIPE Atlas 探针…`);
+    onProgress?.({ stage: 'probes', radius });
     const regular = await probesNear(lat, lng, radius, signal);
     const anchors: ProbeInfo[] = anchorProbes
       .map((a) => ({
@@ -205,7 +207,7 @@ export async function findNearbyTraces(
     const candidates = [...byId.values()].sort((a, b) => a.distanceKm - b.distanceKm).slice(0, 200);
     if (!candidates.length) continue;
 
-    onProgress?.(`读取 ${candidates.length} 个探针到 ${anchor.fqdn} 的最新 traceroute…`);
+    onProgress?.({ stage: 'traces', count: candidates.length, target: anchor.fqdn });
     const ids = candidates.map((p) => p.id);
     const results = (await Promise.all(anchor.traceroute.map((m) => latestTraceroutes(m, ids, signal)))).flat();
     const found = new Map<number, NearbyTrace>();

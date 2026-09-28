@@ -1,17 +1,6 @@
 import type { LngLat } from './geo.ts';
 
-export type ProviderId =
-  | 'aws'
-  | 'azure'
-  | 'gcp'
-  | 'oci'
-  | 'alibaba'
-  | 'tencent'
-  | 'digitalocean'
-  | 'vultr'
-  | 'linode'
-  | 'ovh'
-  | 'hetzner';
+export type ProviderId = 'aws' | 'azure' | 'gcp' | 'tencent';
 
 /** 与某个云区域同城（或就在该云网络内）的 RIPE Atlas 锚点。 */
 export interface AnchorRef {
@@ -35,7 +24,10 @@ export interface Region {
   id: string;
   provider: ProviderId;
   code: string;
+  /** 英文名（官方显示名）。 */
   name: string;
+  /** 中文名，仅阿里云、腾讯云等有官方中文名的区域才有。 */
+  nameZh?: string;
   city: string;
   country: string;
   countryCode: string;
@@ -102,4 +94,34 @@ export interface NetworkData {
   landGraph: LandGraph;
   anchorProbes: AnchorProbe[];
   meta: { builtAt: string; sources: { name: string; url: string; license: string }[] };
+}
+
+// ---------------------------------------------------------------- 公开测试目标（docs/atlas-targets.json）
+
+export interface Localized {
+  zh: string;
+  en: string;
+}
+
+export interface TestTarget {
+  region: string;
+  provider: ProviderId;
+  city: string;
+  host: string;
+  ip: string | null;
+  method: 'icmp' | 'tcp443';
+  source: Localized & { url?: string };
+  /** 初次连通性检查（从美国新泽西的一台机器，不是 RIPE Atlas）。 */
+  localCheck: { icmpMs: number | null; tcpMs: number | null; floorMs: number | null };
+  note?: string;
+  /** 由 build-data 附加的区域坐标。 */
+  lat?: number;
+  lng?: number;
+}
+
+export interface TargetsData {
+  checkedAt: string;
+  localCheck: Localized;
+  notes: string[];
+  targets: TestTarget[];
 }

@@ -85,8 +85,8 @@ describe('routing', () => {
     expect(kinds).toContain('sub');
     const sub = route.segments.find((s) => s.kind === 'sub')!;
     expect(sub.cable?.name).toBe('Test Cable');
-    expect(sub.from).toBe('West LP');
-    expect(sub.to).toBe('East LP');
+    expect(sub.from?.name).toBe('West LP');
+    expect(sub.to?.name).toBe('East LP');
   });
 
   it('computes RTT as twice the one-way fiber delay plus access', () => {
