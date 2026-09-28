@@ -4,3 +4,6 @@ dist/
 # 由 `npm run data` 生成（含 TeleGeography CC BY-NC-SA 数据，不直接入库）
 public/data/
 .DS_Store
+
+# Claude Code 本机设置（含自动上线 hook）
+.claude/settings.local.json
