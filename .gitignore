@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.data-cache/
+# 由 `npm run data` 生成（含 TeleGeography CC BY-NC-SA 数据，不直接入库）
+public/data/
+.DS_Store

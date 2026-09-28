@@ -1,0 +1,6 @@
+name: nsite-infra
+description: global-network.nphunter.gg 静态站点（S3 + CloudFront + ACM + Route 53）与 GitHub 部署角色
+runtime:
+  name: nodejs
+  options:
+    packagemanager: npm

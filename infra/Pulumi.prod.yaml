@@ -1,0 +1,8 @@
+config:
+  aws:region: us-east-1
+  nsite-infra:accountId: "612153676415"
+  nsite-infra:domain: global-network.nphunter.gg
+  nsite-infra:zoneName: nphunter.gg
+  nsite-infra:bucketName: nsite-global-network
+  nsite-infra:githubOwner: illidan53
+  nsite-infra:githubRepo: nsite

@@ -1,0 +1,16 @@
+{
+  "name": "nsite-infra",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "preview": "pulumi preview -s prod",
+    "up": "pulumi up -s prod"
+  },
+  "dependencies": {
+    "@pulumi/aws": "^7.48.0",
+    "@pulumi/pulumi": "^3.228.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.9"
+  }
+}
