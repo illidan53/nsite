@@ -37,8 +37,8 @@ export interface PlanOptions {
   probes: number;
   /** 不用这些 ASN 里的探针（被测云厂商自己的网络，代表不了当地用户）。 */
   excludeAsns?: number[];
-  /** 不用这些探针（以前的结果里一直到不了目标，见 failedProbes）。 */
-  excludeProbes?: number[];
+  /** 按协议不用这些探针（以前的结果里这种协议一直到不了目标，见 failedProbes）。 */
+  excludeProbes?: Partial<Record<BatchTarget['protocol'], number[]>>;
   /** 跳过这些已经测到过的「起点地区|区域」组合（见 pairKey）。 */
   skip?: Set<string>;
 }
@@ -100,10 +100,10 @@ export function nearestTargets(cell: { lat: number; lng: number }, targets: Batc
 export const pairKey = (cell: string, region: string) => `${cell}|${region}`;
 
 /**
- * 以前的结果里，某种协议测过至少 2 次却一次都没到达目标的探针。
- * 多半是探针所在网络拦了这种 traceroute（常见于 TCP 443），再选它只会白花积分。
+ * 以前的结果里，某种协议测过至少 2 次却一次都没到达目标的探针（按协议分开）。
+ * 多半是探针所在网络拦了这种 traceroute（常见于 TCP 443），再用它测这种协议只会白花积分。
  */
-export function failedProbes(results: { probe: number; protocol: 'ICMP' | 'TCP'; rtt: number | null }[]): number[] {
+export function failedProbes(results: { probe: number; protocol: BatchTarget['protocol']; rtt: number | null }[]): Record<BatchTarget['protocol'], number[]> {
   const tally = new Map<string, { probe: number; n: number; ok: number }>();
   for (const r of results) {
     const key = `${r.probe}|${r.protocol}`;
@@ -112,17 +112,23 @@ export function failedProbes(results: { probe: number; protocol: 'ICMP' | 'TCP';
     if (r.rtt !== null) t.ok++;
     tally.set(key, t);
   }
-  return [...new Set([...tally.values()].filter((t) => t.n >= 2 && t.ok === 0).map((t) => t.probe))].sort((a, b) => a - b);
+  const out: Record<BatchTarget['protocol'], number[]> = { ICMP: [], TCP: [] };
+  for (const [key, t] of tally) if (t.n >= 2 && t.ok === 0) out[key.split('|')[1] as BatchTarget['protocol']].push(t.probe);
+  for (const ids of Object.values(out)) ids.sort((a, b) => a - b);
+  return out;
 }
 
 /** 按目标区域分组：每个区域一个测量，探针来自所有把它列为目标的起点地区（超过 1000 个时拆开）。 */
 export function plan(cells: BatchCell[], targets: BatchTarget[], opts: PlanOptions): PlannedMeasurement[] {
   const byRegion = new Map<string, PlannedMeasurement>();
   for (const cell of cells) {
-    const probes = chooseProbes(cell, opts.probes, opts.excludeAsns, opts.excludeProbes);
-    if (!probes.length) continue;
+    // 同一地区对同一种协议用同一组探针；只在一种协议上失败的探针，另一种协议照样用
+    const chosen = new Map<BatchTarget['protocol'], BatchProbe[]>();
     for (const target of nearestTargets(cell, targets, opts.nearest)) {
       if (opts.skip?.has(pairKey(cell.id, target.region))) continue;
+      let probes = chosen.get(target.protocol);
+      if (!probes) chosen.set(target.protocol, (probes = chooseProbes(cell, opts.probes, opts.excludeAsns, opts.excludeProbes?.[target.protocol])));
+      if (!probes.length) continue;
       const m = byRegion.get(target.region) ?? { target, probes: [] };
       for (const probe of probes) m.probes.push({ probe, cell: cell.id });
       byRegion.set(target.region, m);

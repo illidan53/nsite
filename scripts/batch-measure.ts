@@ -2,7 +2,7 @@
 //
 //   node scripts/batch-measure.ts plan  [选项]              只列计划和积分（不需要 key，不花积分）
 //   node scripts/batch-measure.ts run   [选项] --yes        创建测量（需要环境变量 RIPE_ATLAS_KEY），计划写到 docs/measurements/<批次>.json
-//   node scripts/batch-measure.ts run   --resume <批次> --yes  继续创建上次中断时还没建的测量
+//   node scripts/batch-measure.ts run   --resume <批次> --max-credits <n> --yes  继续创建上次中断时还没建的测量
 //   node scripts/batch-measure.ts collect                    读取所有批次的结果（公开 API），写 docs/measured.json
 //
 // 选项：--nearest <n|all>  每家厂商离起点最近的 n 个区域（默认 3）
@@ -62,29 +62,42 @@ interface RunFile {
 // ---------------------------------------------------------------- 参数
 
 const BOOLEAN_FLAGS = new Set(['yes', 'skip-measured']);
+const VALUE_FLAGS = new Set(['nearest', 'probes', 'split', 'cells', 'max-credits', 'resume']);
 
+/** 选项写错（少了值、拼错、不是整数）时直接报错：宁可不跑，也不要按默认值花积分。 */
 function parseArgs(argv: string[]) {
   const flags = new Map<string, string>();
   const rest: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
+    const name = a.slice(2);
     if (!a.startsWith('--')) rest.push(a);
-    else if (BOOLEAN_FLAGS.has(a.slice(2))) flags.set(a.slice(2), '1');
-    else flags.set(a.slice(2), argv[++i] ?? '');
+    else if (BOOLEAN_FLAGS.has(name)) flags.set(name, '1');
+    else if (VALUE_FLAGS.has(name)) {
+      const v = argv[++i];
+      if (!v || v.startsWith('--')) throw new Error(`${a} 需要一个值`);
+      flags.set(name, v);
+    } else throw new Error(`未知选项 ${a}`);
   }
-  const nearest = flags.get('nearest') ?? '3';
+  const int = (name: string, fallback: number | null) => {
+    const v = flags.get(name);
+    if (v === undefined) return fallback;
+    if (!/^\d+$/.test(v)) throw new Error(`--${name} 需要整数，收到 ${v}`);
+    return Number(v);
+  };
+  const nearest = flags.get('nearest');
   const split = flags.get('split');
   const only = flags.get('cells');
   return {
     command: rest[0] ?? 'plan',
     opts: {
-      nearest: nearest === 'all' ? ('all' as const) : Math.max(1, Number(nearest)),
-      probes: Math.max(1, Number(flags.get('probes') ?? 2)),
+      nearest: nearest === 'all' ? ('all' as const) : Math.max(1, int('nearest', 3)!),
+      probes: Math.max(1, int('probes', 2)!),
       split: split === undefined ? DEFAULT_SPLIT : split === 'none' ? [] : split.split(',').map((s) => s.trim().toUpperCase()),
       excludeAsns: PROVIDERS.flatMap((p) => p.asns),
     },
     cells: only ? only.split(',').map((s) => s.trim().toUpperCase()) : null,
-    maxCredits: flags.has('max-credits') ? Number(flags.get('max-credits')) : null,
+    maxCredits: int('max-credits', null),
     resume: flags.get('resume') ?? null,
     skipMeasured: flags.has('skip-measured'),
     yes: flags.has('yes'),
@@ -142,9 +155,9 @@ async function fetchProbes(): Promise<BatchProbe[]> {
 }
 
 /** 已有结果：要排除的失败探针，以及已经测到过的「起点地区|区域」组合。 */
-async function loadPrevious(targets: BatchTarget[]): Promise<{ failed: number[]; measured: Set<string>; stale: string[] }> {
+async function loadPrevious(targets: BatchTarget[]): Promise<{ failed: ReturnType<typeof failedProbes>; measured: Set<string>; stale: string[] }> {
   const data = await readJson<MeasuredData>(MEASURED).catch(() => null);
-  if (!data) return { failed: [], measured: new Set(), stale: [] };
+  if (!data) return { failed: { ICMP: [], TCP: [] }, measured: new Set(), stale: [] };
   const protocol = new Map(targets.map((t) => [t.region, t.protocol]));
   const results: Parameters<typeof failedProbes>[0] = [];
   const measured = new Set<string>();
@@ -155,21 +168,33 @@ async function loadPrevious(targets: BatchTarget[]): Promise<{ failed: number[];
       if (pair.results.some((r) => r.rtt !== null)) measured.add(pairKey(cellId, region));
     }
   }
-  // 比 measured.json 新的批次还没 collect：跳过已测时会把它们的组合再买一遍
+  // 还没 collect 的批次、或中断后还没建完的批次：跳过已测时会把它们的组合再买一遍
   const collected = new Set(data.runs.map((r) => r.id));
-  const files = (await readdir(RUNS).catch(() => [])).filter((f) => f.endsWith('.json'));
-  const stale = files.map((f) => f.slice(0, -5)).filter((id) => !collected.has(id));
+  const stale: string[] = [];
+  for (const f of (await readdir(RUNS).catch(() => [])).filter((f) => f.endsWith('.json'))) {
+    const run = await readJson<RunFile>(path.join(RUNS, f));
+    if (!collected.has(run.id) || run.measurements.some((m) => m.msm === null)) stale.push(run.id);
+  }
   return { failed: failedProbes(results), measured, stale };
 }
 
-type Admin1 = Feature<Geometry, { iso: string; labelLat: number; labelLng: number }>;
+type Admin1 = Feature<Geometry, { iso: string; adm0: string; labelLat: number; labelLng: number; area: number | null }>;
+
+/** 分省国家在 Natural Earth 里的 ISO3：排掉挂在别国名下的省级单位（如 US-PR 属于 PRI）。 */
+const SPLIT_ADM0: Record<string, string> = { US: 'USA', CA: 'CAN', BR: 'BRA', RU: 'RUS', CN: 'CHN', IN: 'IND', AU: 'AUS' };
+/** 探针落在省界外时，离最近的省界顶点超过这个距离就不用（多半是坐标或国家代码不准）。 */
+const MAX_OFF_BORDER_KM = 100;
+
+const vertices = (g: Geometry): number[][] => (g.type === 'Polygon' ? g.coordinates.flat() : g.type === 'MultiPolygon' ? g.coordinates.flat(2) : []);
 
 /** 起点地区：大国按省/州（探针落在哪个省界里），其余按国家。 */
 async function buildCells(probes: BatchProbe[], split: string[]): Promise<BatchCell[]> {
   const topo = await readJson<Topology>(path.join(DATA, 'admin1.topo.json'));
-  const admin1 = (feature(topo, topo.objects.admin1) as unknown as { features: Admin1[] }).features.filter((f) =>
-    split.includes(f.properties.iso?.slice(0, 2)),
-  );
+  // 只要正式的省级代码（Natural Earth 里 AU-X02~ 这类带 ~ 的前端也认不出）
+  const admin1 = (feature(topo, topo.objects.admin1) as unknown as { features: Admin1[] }).features.filter((f) => {
+    const cc = f.properties.iso?.slice(0, 2);
+    return split.includes(cc) && /^[A-Z]{2}-[A-Z0-9]{1,3}$/.test(f.properties.iso.toUpperCase()) && (!SPLIT_ADM0[cc] || f.properties.adm0 === SPLIT_ADM0[cc]);
+  });
   const boxes = admin1.map((f) => geoBounds(f));
   const inBox = (i: number, lat: number, lng: number) => {
     const [[w, s], [e, n]] = boxes[i];
@@ -179,19 +204,35 @@ async function buildCells(probes: BatchProbe[], split: string[]): Promise<BatchC
   const groups = new Map<string, BatchProbe[]>();
   for (const p of probes) {
     let key = p.cc;
-    if (split.includes(p.cc)) {
-      const same = admin1.map((f, i) => ({ f, i })).filter(({ f }) => f.properties.iso.startsWith(`${p.cc}-`));
-      const hit = same.find(({ f, i }) => inBox(i, p.lat, p.lng) && geoContains(f, [p.lng, p.lat]));
-      // 落在海岸线外（探针坐标不精确）时归到标注点最近的省
-      const nearest = hit ?? same.sort((a, b) => haversineKm(p.lat, p.lng, a.f.properties.labelLat, a.f.properties.labelLng) - haversineKm(p.lat, p.lng, b.f.properties.labelLat, b.f.properties.labelLng))[0];
-      if (nearest) key = nearest.f.properties.iso.toUpperCase();
+    const same = split.includes(p.cc) ? admin1.map((f, i) => ({ f, i })).filter(({ f }) => f.properties.iso.startsWith(`${p.cc}-`)) : [];
+    if (same.length) {
+      let iso = same.find(({ f, i }) => inBox(i, p.lat, p.lng) && geoContains(f, [p.lng, p.lat]))?.f.properties.iso;
+      if (!iso) {
+        // 落在省界外（坐标不精确、简化后的省界漏掉了河中岛和海岸）：归到省界顶点离它最近的省。
+        // 太远就不用这个探针，也不归到整个国家：那样会生成新的国家级地区，覆盖以前按国家测的数据。
+        let best = MAX_OFF_BORDER_KM;
+        for (const { f } of same) {
+          for (const [lng, lat] of vertices(f.geometry)) {
+            const km = haversineKm(p.lat, p.lng, lat, lng);
+            if (km < best) [best, iso] = [km, f.properties.iso];
+          }
+        }
+        if (!iso) continue;
+      }
+      key = iso.toUpperCase();
     }
     const list = groups.get(key) ?? [];
     list.push(p);
     groups.set(key, list);
   }
 
-  const label = new Map(admin1.map((f) => [f.properties.iso.toUpperCase(), f.properties]));
+  // 同一代码有多块时（如 AU-NSW 还有豪勋爵岛）用面积最大的那块的标注点
+  const label = new Map<string, Admin1['properties']>();
+  for (const f of admin1) {
+    const k = f.properties.iso.toUpperCase();
+    const prev = label.get(k);
+    if (!prev || (f.properties.area ?? 0) > (prev.area ?? 0)) label.set(k, f.properties);
+  }
   return [...groups.entries()]
     .map(([id, list]) => {
       const l = label.get(id);
@@ -394,7 +435,9 @@ async function main() {
     excludeProbes: previous.failed,
     ...(args.skipMeasured ? { skip: previous.measured } : {}),
   };
-  if (previous.failed.length) console.log(`以前一直到不了目标、这次不用的探针：${previous.failed.join(', ')}`);
+  for (const [protocol, ids] of Object.entries(previous.failed)) {
+    if (ids.length) console.log(`以前 ${protocol} 一直到不了目标、这次 ${protocol} 不用的探针：${ids.join(', ')}`);
+  }
   if (opts.skip) console.log(`跳过已经测到过的组合 ${fmt(opts.skip.size)} 个`);
   const allCells = await buildCells(probes, opts.split);
   const cells = args.cells ? allCells.filter((c) => args.cells!.includes(c.id)) : allCells;

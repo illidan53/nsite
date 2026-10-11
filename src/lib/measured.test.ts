@@ -37,6 +37,21 @@ describe('measuredOriginFor', () => {
     const both: MeasuredData = { ...data, cells: { ...data.cells, US: cell('US', 38.6, -90.2) } };
     expect(measuredOriginFor(both, place('US', 'US-PA'), { lat: 40.5, lng: -77 })).toMatchObject({ id: 'US-NJ', exact: false });
     expect(measuredOriginFor(both, place('US', 'US-MO'), { lat: 38.6, lng: -90.2 })).toMatchObject({ id: 'US-NJ', exact: false });
+    // 点在省界外（没有 admin1）时也一样
+    expect(measuredOriginFor(both, place('US'), { lat: 40.5, lng: -77 })).toMatchObject({ id: 'US-NJ', exact: false });
+    expect(measuredOriginFor(data, place('DE'), { lat: 48, lng: 11 })).toMatchObject({ id: 'DE', exact: true });
+  });
+
+  it('ignores a province cell that belongs to another country', () => {
+    const pr: MeasuredData = { ...data, cells: { 'US-PR': cell('US', 18.3, -64.9), PR: cell('PR', 18.4, -66.1) } };
+    expect(measuredOriginFor(pr, place('PR', 'US-PR'), { lat: 18.4, lng: -66.1 })).toMatchObject({ id: 'PR', exact: true });
+  });
+
+  it('maps French overseas departments to their own country cells', () => {
+    const fr: MeasuredData = { ...data, cells: { FR: cell('FR', 48.8, 2.3), RE: cell('RE', -21.1, 55.5) } };
+    expect(measuredOriginFor(fr, place('FR', 'FR-RE'), { lat: -21.1, lng: 55.5 })).toMatchObject({ id: 'RE', exact: true });
+    expect(measuredOriginFor(fr, place('FR', 'FR-MQ'), { lat: 14.6, lng: -61 })).toBeNull();
+    expect(measuredOriginFor(fr, place('FR', 'FR-IDF'), { lat: 48.8, lng: 2.3 })).toMatchObject({ id: 'FR', exact: true });
   });
 
   it('returns null for countries without measurements', () => {

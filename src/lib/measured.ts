@@ -21,6 +21,9 @@ export interface MeasuredOrigin {
   exact: boolean;
 }
 
+/** Natural Earth 把这些海外省算在法国名下（FR-xx），RIPE Atlas 探针用的是它们自己的国家代码。 */
+const OVERSEAS: Record<string, string> = { 'FR-RE': 'RE', 'FR-GF': 'GF', 'FR-GP': 'GP', 'FR-MQ': 'MQ', 'FR-YT': 'YT' };
+
 /**
  * 点击位置对应的批量实测起点：先找所在省/州，再找同一国家里最近的已测省/州，最后用整个国家。
  * 大国分省测过之后，早期按国家测的旧地区（只有一个探针）仍留在数据里，所以省/州优先于国家。
@@ -28,7 +31,10 @@ export interface MeasuredOrigin {
 export function measuredOriginFor(data: MeasuredData | null, place: Place | null, origin: { lat: number; lng: number } | null): MeasuredOrigin | null {
   const c = cellOf(place);
   if (!data || !c || !origin) return null;
-  if (data.cells[c.cell]) return { id: c.cell, cell: data.cells[c.cell], exact: true };
+  const own = data.cells[c.cell];
+  if (c.cell !== c.country && own?.country === c.country) return { id: c.cell, cell: own, exact: true };
+  const alias = OVERSEAS[c.cell];
+  if (alias) return data.cells[alias] ? { id: alias, cell: data.cells[alias], exact: true } : null;
   let best: MeasuredOrigin | null = null;
   let bestKm = Infinity;
   for (const [id, cell] of Object.entries(data.cells)) {

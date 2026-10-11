@@ -74,6 +74,15 @@ describe('plan', () => {
     expect(ms.map((m) => m.target.region).sort()).toEqual(['aws:eu-west-1', 'gcp:us-east4']);
     expect(planCost(ms).results).toBe(3);
   });
+
+  it('excludes failed probes only for the protocol they failed on', () => {
+    const mixed = [target('aws:us-east-1', 'aws', 38.9, -77.4), { ...target('tencent:na-ashburn', 'tencent', 39, -77.5), protocol: 'ICMP' as const }];
+    const ms = plan([cells[0]], mixed, { nearest: 1, probes: 1, excludeProbes: { TCP: [1] } });
+    expect(Object.fromEntries(ms.map((m) => [m.target.region, m.probes.map((p) => p.probe.id)]))).toEqual({
+      'aws:us-east-1': [3],
+      'tencent:na-ashburn': [1],
+    });
+  });
 });
 
 describe('failedProbes', () => {
@@ -87,9 +96,11 @@ describe('failedProbes', () => {
         r(2, 'TCP', null), r(2, 'TCP', 30),
         // 3：只测过一次，失败
         r(3, 'ICMP', null),
-        // 4：全部失败
+        // 4：TCP 全部失败，ICMP 只测过一次
         r(4, 'TCP', null), r(4, 'TCP', null), r(4, 'ICMP', null),
+        // 5：ICMP 全部失败
+        r(5, 'ICMP', null), r(5, 'ICMP', null), r(5, 'TCP', 12),
       ]),
-    ).toEqual([1, 4]);
+    ).toEqual({ TCP: [1, 4], ICMP: [5] });
   });
 });
