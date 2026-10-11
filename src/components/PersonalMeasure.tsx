@@ -3,7 +3,7 @@ import { cellOf, listMeasurements, measurementResults, startMeasurement, type Me
 import type { TraceResult } from '../lib/atlas.ts';
 import { haversineKm } from '../lib/geo.ts';
 import { useI18n } from '../lib/i18n.tsx';
-import type { MeasuredOrigin } from '../lib/measured.ts';
+import { fasterThanLight, type MeasuredOrigin } from '../lib/measured.ts';
 import type { Place } from '../lib/places.ts';
 import type { MeasuredData, Region, TestTarget } from '../lib/types.ts';
 import type { TraceOverlay } from './GlobeView.tsx';
@@ -166,8 +166,11 @@ export default function PersonalMeasure({ region, origin, place, publicTarget, m
 
   const probeRtt = (e: Entry, id: number) => {
     const r = results?.find((x) => x.probeId === id);
-    if (r) return r.reached ? lastRtt(r) : null;
-    return e.known.get(id) ?? null;
+    if (!r) return e.known.get(id) ?? null;
+    const rtt = r.reached ? lastRtt(r) : null;
+    const p = e.probes.find((x) => x.id === id);
+    // 比光速还快：途中设备代答，不算到达（和 collect 的判断一致）
+    return rtt !== null && p && fasterThanLight(rtt, haversineKm(p.lat, p.lng, region.lat, region.lng)) ? null : rtt;
   };
 
   return (

@@ -49,6 +49,14 @@ export function measuredOriginFor(data: MeasuredData | null, place: Place | null
   return data.cells[c.country] ? { id: c.country, cell: data.cells[c.country], exact: true } : null;
 }
 
+/**
+ * 光在光纤里约 200 km/ms，往返 RTT 不可能低于「距离 / 100」毫秒（留 200 km 给只精确到城市的坐标）。
+ * 比这还快的「到达」是途中设备冒充目标代答了 TCP 握手（透明代理、防火墙），不是目标本身。
+ */
+export function fasterThanLight(rttMs: number, km: number): boolean {
+  return rttMs < (km - 200) / 100;
+}
+
 /** 该地区到该区域各探针里最低的到达 RTT；都没到达时为 null。 */
 export function bestRtt(pair: MeasuredPair | undefined): number | null {
   const rtts = (pair?.results ?? []).map((r) => r.rtt).filter((r): r is number => r !== null);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bestRtt, measuredOriginFor } from './measured.ts';
+import { bestRtt, fasterThanLight, measuredOriginFor } from './measured.ts';
 import type { Place } from './places.ts';
 import type { MeasuredData } from './types.ts';
 
@@ -56,6 +56,16 @@ describe('measuredOriginFor', () => {
 
   it('returns null for countries without measurements', () => {
     expect(measuredOriginFor(data, place('FR', 'FR-IDF'), { lat: 48.8, lng: 2.3 })).toBeNull();
+  });
+});
+
+describe('fasterThanLight', () => {
+  it('flags replies faster than light in fiber, with slack for city-level coordinates', () => {
+    // 北京 → 首尔约 950 km：0.9 ms 不可能，35 ms 正常
+    expect(fasterThanLight(0.9, 950)).toBe(true);
+    expect(fasterThanLight(35, 950)).toBe(false);
+    // 同城或 200 km 以内不判断
+    expect(fasterThanLight(0.1, 150)).toBe(false);
   });
 });
 

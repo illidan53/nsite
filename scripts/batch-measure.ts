@@ -25,6 +25,7 @@ import { feature } from 'topojson-client';
 import type { Topology } from 'topojson-specification';
 import { parseTraceroute } from '../src/lib/atlas.ts';
 import { haversineKm } from '../src/lib/geo.ts';
+import { fasterThanLight } from '../src/lib/measured.ts';
 import { PROVIDERS } from '../src/lib/providers.ts';
 import type { MeasuredData, NetworkData, TargetsData } from '../src/lib/types.ts';
 import {
@@ -365,8 +366,10 @@ async function collect() {
   const out: MeasuredData = { generatedAt: new Date().toISOString(), runs: [], probes: {}, cells: {} };
   // 早期批次里有少数探针就在被测云厂商的网络里，结果代表不了当地用户，一律不收
   const cloud = new Set(PROVIDERS.flatMap((p) => p.asns));
+  const regions = new Map((await readJson<NetworkData>(path.join(DATA, 'network.json'))).regions.map((r) => [r.id, r]));
   let pending = 0;
   let skipped = 0;
+  let spoofed = 0;
   for (const f of files) {
     const run = await readJson<RunFile>(path.join(RUNS, f));
     const runIdx = out.runs.length;
@@ -393,7 +396,15 @@ async function collect() {
         // 同一地区同一区域以最新批次为准
         if (!pair || pair.run !== runIdx) pair = cell.regions[m.region] = { run: runIdx, msm: m.msm, target: m.host, at: 0, results: [] };
         const dest = t.hops.filter((h) => h.ip === t.dstAddr && h.minRtt !== null).at(-1);
-        pair.results.push({ probe: p.id, rtt: t.reached && dest ? Math.round(dest.minRtt! * 10) / 10 : null });
+        let rtt = t.reached && dest ? Math.round(dest.minRtt! * 10) / 10 : null;
+        const probe = run.probes[p.id];
+        const region = regions.get(m.region);
+        // 比光速还快的「到达」是途中设备代答，不算到达
+        if (rtt !== null && probe && region && fasterThanLight(rtt, haversineKm(probe.lat, probe.lng, region.lat, region.lng))) {
+          rtt = null;
+          spoofed++;
+        }
+        pair.results.push({ probe: p.id, rtt });
         pair.at = Math.max(pair.at, t.timestamp);
       }
       process.stdout.write('.');
@@ -405,6 +416,7 @@ async function collect() {
   const rs = pairs.flatMap((p) => p.results);
   console.log(`\n写入 docs/measured.json：${Object.keys(out.cells).length} 个地区、${pairs.length} 个地区-区域组合、${rs.length} 个结果，到达目标 ${rs.filter((r) => r.rtt !== null).length} 个`);
   if (skipped) console.log(`跳过 ${skipped} 个来自被测云厂商网络内探针的结果`);
+  if (spoofed) console.log(`${spoofed} 个结果比光速还快（途中设备代答），按未到达处理`);
   if (pending) console.log(`还有 ${pending} 个探针没有返回结果（测量可能还在进行，稍后再 collect 一次）`);
 }
 
