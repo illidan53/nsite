@@ -9,9 +9,11 @@
 //       --probes <k>       每个起点地区的探针数（默认 2）
 //       --split <CC,...>   细分到省/州的国家（默认 US,CA,BR,RU,CN,IN,AU；传 none 表示不细分）
 //       --cells <id,...>   只测这些起点地区（如 JP,IE 或 US-NJ），用于补测
-//       --max-credits <n>  计划超过这个积分就不创建（run 必填）
+//       --skip-measured    跳过 docs/measured.json 里已经测到过（至少一个探针到达）的「起点地区-区域」组合
+//       --max-credits <n>  计划超过这个积分就不创建（run 和 run --resume 都必填）
 //
 // 被测云厂商自己网络里的探针（src/lib/providers.ts 里的 ASN）不参与：它们代表不了当地用户。
+// 以前的结果里某种协议测过至少 2 次却从没到达的探针也不参与（多半是所在网络拦了 traceroute）。
 //
 // 需要先 npm run data（用 public/data 里的区域、公开地址和省界）。
 
@@ -27,7 +29,9 @@ import { PROVIDERS } from '../src/lib/providers.ts';
 import type { MeasuredData, NetworkData, TargetsData } from '../src/lib/types.ts';
 import {
   CREDITS_PER_RESULT,
+  failedProbes,
   median,
+  pairKey,
   plan,
   planCost,
   type BatchCell,
@@ -44,10 +48,12 @@ const MEASURED = path.join(ROOT, 'docs', 'measured.json');
 const ATLAS = 'https://atlas.ripe.net/api/v2';
 const DEFAULT_SPLIT = ['US', 'CA', 'BR', 'RU', 'CN', 'IN', 'AU'];
 
+type RunOptions = Omit<PlanOptions, 'skip'> & { split: string[]; skipped?: number };
+
 interface RunFile {
   id: string;
   createdAt: string;
-  options: PlanOptions & { split: string[] };
+  options: RunOptions;
   cells: Record<string, { country: string; lat: number; lng: number }>;
   probes: Record<string, { lat: number; lng: number; asn: number; cc: string }>;
   measurements: { region: string; host: string; protocol: 'ICMP' | 'TCP'; probes: { id: number; cell: string }[]; msm: number | null }[];
@@ -55,13 +61,15 @@ interface RunFile {
 
 // ---------------------------------------------------------------- 参数
 
+const BOOLEAN_FLAGS = new Set(['yes', 'skip-measured']);
+
 function parseArgs(argv: string[]) {
   const flags = new Map<string, string>();
   const rest: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith('--')) rest.push(a);
-    else if (a === '--yes') flags.set('yes', '1');
+    else if (BOOLEAN_FLAGS.has(a.slice(2))) flags.set(a.slice(2), '1');
     else flags.set(a.slice(2), argv[++i] ?? '');
   }
   const nearest = flags.get('nearest') ?? '3';
@@ -78,6 +86,7 @@ function parseArgs(argv: string[]) {
     cells: only ? only.split(',').map((s) => s.trim().toUpperCase()) : null,
     maxCredits: flags.has('max-credits') ? Number(flags.get('max-credits')) : null,
     resume: flags.get('resume') ?? null,
+    skipMeasured: flags.has('skip-measured'),
     yes: flags.has('yes'),
   };
 }
@@ -132,6 +141,27 @@ async function fetchProbes(): Promise<BatchProbe[]> {
   return out;
 }
 
+/** 已有结果：要排除的失败探针，以及已经测到过的「起点地区|区域」组合。 */
+async function loadPrevious(targets: BatchTarget[]): Promise<{ failed: number[]; measured: Set<string>; stale: string[] }> {
+  const data = await readJson<MeasuredData>(MEASURED).catch(() => null);
+  if (!data) return { failed: [], measured: new Set(), stale: [] };
+  const protocol = new Map(targets.map((t) => [t.region, t.protocol]));
+  const results: Parameters<typeof failedProbes>[0] = [];
+  const measured = new Set<string>();
+  for (const [cellId, cell] of Object.entries(data.cells)) {
+    for (const [region, pair] of Object.entries(cell.regions)) {
+      const p = protocol.get(region);
+      if (p) for (const r of pair.results) results.push({ probe: r.probe, protocol: p, rtt: r.rtt });
+      if (pair.results.some((r) => r.rtt !== null)) measured.add(pairKey(cellId, region));
+    }
+  }
+  // 比 measured.json 新的批次还没 collect：跳过已测时会把它们的组合再买一遍
+  const collected = new Set(data.runs.map((r) => r.id));
+  const files = (await readdir(RUNS).catch(() => [])).filter((f) => f.endsWith('.json'));
+  const stale = files.map((f) => f.slice(0, -5)).filter((id) => !collected.has(id));
+  return { failed: failedProbes(results), measured, stale };
+}
+
 type Admin1 = Feature<Geometry, { iso: string; labelLat: number; labelLng: number }>;
 
 /** 起点地区：大国按省/州（探针落在哪个省界里），其余按国家。 */
@@ -180,7 +210,7 @@ async function buildCells(probes: BatchProbe[], split: string[]): Promise<BatchC
 
 const fmt = (n: number) => n.toLocaleString('en-US');
 
-function printTiers(cellsBySplit: Map<string, BatchCell[]>, targets: BatchTarget[], excludeAsns: number[]) {
+function printTiers(cellsBySplit: Map<string, BatchCell[]>, targets: BatchTarget[], base: Pick<PlanOptions, 'excludeAsns' | 'excludeProbes' | 'skip'>) {
   const tiers: { label: string; nearest: number | 'all'; probes: number; split: boolean }[] = [
     { label: '每家最近 1 个 · 1 探针 · 只按国家', nearest: 1, probes: 1, split: false },
     { label: '每家最近 2 个 · 2 探针 · 大国分省', nearest: 2, probes: 2, split: true },
@@ -189,26 +219,27 @@ function printTiers(cellsBySplit: Map<string, BatchCell[]>, targets: BatchTarget
     { label: '全部区域 · 1 探针 · 只按国家', nearest: 'all', probes: 1, split: false },
     { label: '全部区域 · 2 探针 · 大国分省', nearest: 'all', probes: 2, split: true },
   ];
-  console.log(`\n参考档位（一次性 traceroute，每个结果 ${CREDITS_PER_RESULT} 积分）：`);
+  console.log(`\n参考档位（一次性 traceroute，每个结果 ${CREDITS_PER_RESULT} 积分${base.skip ? '，已跳过测到过的组合' : ''}）：`);
   for (const t of tiers) {
     const cells = cellsBySplit.get(t.split ? 'split' : 'none')!;
-    const c = planCost(plan(cells, targets, { nearest: t.nearest, probes: t.probes, excludeAsns }));
+    const c = planCost(plan(cells, targets, { ...base, nearest: t.nearest, probes: t.probes }));
     console.log(`  ${t.label.padEnd(24, '　')}  地区 ${String(cells.length).padStart(4)}  测量 ${String(c.measurements).padStart(4)}  结果 ${fmt(c.results).padStart(7)}  积分 ${fmt(c.credits).padStart(10)}`);
   }
 }
 
 function runId() {
-  return new Date().toISOString().slice(0, 16).replace(/[-:]/g, '').replace('T', '-');
+  return new Date().toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
 }
 
 function toRunFile(id: string, opts: PlanOptions & { split: string[] }, cells: BatchCell[], planned: PlannedMeasurement[]): RunFile {
+  const { skip, ...options } = opts;
   const used = new Set(planned.flatMap((m) => m.probes.map((p) => p.cell)));
   const probes: RunFile['probes'] = {};
   for (const m of planned) for (const { probe } of m.probes) probes[probe.id] = { lat: probe.lat, lng: probe.lng, asn: probe.asn, cc: probe.cc };
   return {
     id,
     createdAt: new Date().toISOString(),
-    options: opts,
+    options: { ...options, ...(skip ? { skipped: skip.size } : {}) },
     cells: Object.fromEntries(cells.filter((c) => used.has(c.id)).map((c) => [c.id, { country: c.country, lat: c.lat, lng: c.lng }])),
     probes,
     measurements: planned.map((m) => ({
@@ -270,7 +301,7 @@ async function createAll(run: RunFile, file: string, key: string) {
       } catch (err) {
         const e = err as Error & { status?: number };
         // 同时进行的测量数、速率等限制：等一会儿再试；其它错误（如积分不足）直接停下
-        const transient = e.status === 429 || e.status === 503 || /simultaneous|concurrent|too many|rate/i.test(e.message);
+        const transient = e.status === 429 || e.status === 503 || /simultaneous|concurrent|too many|rate.?limit/i.test(e.message);
         if (!transient || attempt >= 30) {
           await writeFile(file, JSON.stringify(run, null, 1) + '\n');
           throw e;
@@ -345,27 +376,40 @@ async function main() {
   if (args.command === 'run' && args.resume) {
     const key = process.env.RIPE_ATLAS_KEY;
     if (!key) throw new Error('需要环境变量 RIPE_ATLAS_KEY');
-    if (!args.yes) throw new Error('确认要花积分时加 --yes');
     const file = path.join(RUNS, `${args.resume}.json`);
-    return createAll(await readJson<RunFile>(file), file, key);
+    const run = await readJson<RunFile>(file);
+    const left = run.measurements.filter((m) => m.msm === null).reduce((s, m) => s + m.probes.length, 0) * CREDITS_PER_RESULT;
+    if (args.maxCredits === null) throw new Error('run --resume 也需要 --max-credits');
+    if (left > args.maxCredits) throw new Error(`剩下的测量约需 ${fmt(left)} 积分，超过 --max-credits ${fmt(args.maxCredits)}`);
+    if (!args.yes) throw new Error('确认要花积分时加 --yes');
+    return createAll(run, file, key);
   }
 
   console.log('读取区域和公开地址、拉取在线探针…');
   const [targets, probes] = await Promise.all([loadTargets(), fetchProbes()]);
-  const allCells = await buildCells(probes, args.opts.split);
+  const previous = await loadPrevious(targets);
+  if (args.skipMeasured && previous.stale.length) throw new Error(`批次 ${previous.stale.join(',')} 还没 collect，先运行 collect 再用 --skip-measured`);
+  const opts: PlanOptions & { split: string[] } = {
+    ...args.opts,
+    excludeProbes: previous.failed,
+    ...(args.skipMeasured ? { skip: previous.measured } : {}),
+  };
+  if (previous.failed.length) console.log(`以前一直到不了目标、这次不用的探针：${previous.failed.join(', ')}`);
+  if (opts.skip) console.log(`跳过已经测到过的组合 ${fmt(opts.skip.size)} 个`);
+  const allCells = await buildCells(probes, opts.split);
   const cells = args.cells ? allCells.filter((c) => args.cells!.includes(c.id)) : allCells;
   if (args.cells && cells.length !== args.cells.length) throw new Error(`找不到起点地区：${args.cells.filter((id) => !cells.some((c) => c.id === id)).join(',')}`);
-  const planned = plan(cells, targets, args.opts);
+  const planned = plan(cells, targets, opts);
   const cost = planCost(planned);
   console.log(`在线探针 ${fmt(probes.length)} 个，公开地址 ${targets.length} 个区域`);
   console.log(
-    `本次选项：每家最近 ${args.opts.nearest} 个区域 · 每地区 ${args.opts.probes} 个探针 · 分省 ${args.opts.split.join(',') || '无'}`,
+    `本次选项：每家最近 ${opts.nearest} 个区域 · 每地区 ${opts.probes} 个探针 · 分省 ${opts.split.join(',') || '无'}`,
   );
   console.log(`起点地区 ${cells.length} 个 → 测量 ${cost.measurements} 个，结果 ${fmt(cost.results)} 个，约 ${fmt(cost.credits)} 积分`);
 
   if (args.command === 'plan') {
-    const other = args.opts.split.length ? await buildCells(probes, []) : await buildCells(probes, DEFAULT_SPLIT);
-    printTiers(new Map([[args.opts.split.length ? 'split' : 'none', allCells], [args.opts.split.length ? 'none' : 'split', other]]), targets, args.opts.excludeAsns);
+    const other = opts.split.length ? await buildCells(probes, []) : await buildCells(probes, DEFAULT_SPLIT);
+    printTiers(new Map([[opts.split.length ? 'split' : 'none', allCells], [opts.split.length ? 'none' : 'split', other]]), targets, opts);
     console.log('\nRIPE Atlas 每个账号每天最多花 1,000,000 积分、产生 100,000 个结果，同时最多 100 个测量。');
     return;
   }
@@ -381,8 +425,9 @@ async function main() {
   await mkdir(RUNS, { recursive: true });
   const id = runId();
   const file = path.join(RUNS, `${id}.json`);
-  const run = toRunFile(id, args.opts, cells, planned);
-  await writeFile(file, JSON.stringify(run, null, 1) + '\n');
+  const run = toRunFile(id, opts, cells, planned);
+  // wx：同名批次文件已存在时报错，不覆盖已经花了积分的批次
+  await writeFile(file, JSON.stringify(run, null, 1) + '\n', { flag: 'wx' });
   console.log(`批次 ${id}，计划已写入 ${path.relative(ROOT, file)}`);
   await createAll(run, file, key);
   console.log('全部创建完成。一次性测量通常 5–15 分钟内出结果，之后运行：node scripts/batch-measure.ts collect');

@@ -21,23 +21,26 @@ export interface MeasuredOrigin {
   exact: boolean;
 }
 
-/** 点击位置对应的批量实测起点：先找所在省/州，再找所在国家，最后找同一国家里最近的已测地区。 */
+/**
+ * 点击位置对应的批量实测起点：先找所在省/州，再找同一国家里最近的已测省/州，最后用整个国家。
+ * 大国分省测过之后，早期按国家测的旧地区（只有一个探针）仍留在数据里，所以省/州优先于国家。
+ */
 export function measuredOriginFor(data: MeasuredData | null, place: Place | null, origin: { lat: number; lng: number } | null): MeasuredOrigin | null {
   const c = cellOf(place);
   if (!data || !c || !origin) return null;
   if (data.cells[c.cell]) return { id: c.cell, cell: data.cells[c.cell], exact: true };
-  if (data.cells[c.country]) return { id: c.country, cell: data.cells[c.country], exact: true };
   let best: MeasuredOrigin | null = null;
   let bestKm = Infinity;
   for (const [id, cell] of Object.entries(data.cells)) {
-    if (cell.country !== c.country) continue;
+    if (cell.country !== c.country || id === c.country) continue;
     const km = haversineKm(origin.lat, origin.lng, cell.lat, cell.lng);
     if (km < bestKm) {
       bestKm = km;
       best = { id, cell, exact: false };
     }
   }
-  return best;
+  if (best) return best;
+  return data.cells[c.country] ? { id: c.country, cell: data.cells[c.country], exact: true } : null;
 }
 
 /** 该地区到该区域各探针里最低的到达 RTT；都没到达时为 null。 */

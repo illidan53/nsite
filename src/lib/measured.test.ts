@@ -33,6 +33,12 @@ describe('measuredOriginFor', () => {
     expect(measuredOriginFor(data, place('US', 'US-PA'), { lat: 40.5, lng: -77 })).toMatchObject({ id: 'US-NJ', exact: false });
   });
 
+  it('prefers the nearest measured province over an older country-level cell', () => {
+    const both: MeasuredData = { ...data, cells: { ...data.cells, US: cell('US', 38.6, -90.2) } };
+    expect(measuredOriginFor(both, place('US', 'US-PA'), { lat: 40.5, lng: -77 })).toMatchObject({ id: 'US-NJ', exact: false });
+    expect(measuredOriginFor(both, place('US', 'US-MO'), { lat: 38.6, lng: -90.2 })).toMatchObject({ id: 'US-NJ', exact: false });
+  });
+
   it('returns null for countries without measurements', () => {
     expect(measuredOriginFor(data, place('FR', 'FR-IDF'), { lat: 48.8, lng: 2.3 })).toBeNull();
   });

@@ -37,6 +37,10 @@ export interface PlanOptions {
   probes: number;
   /** 不用这些 ASN 里的探针（被测云厂商自己的网络，代表不了当地用户）。 */
   excludeAsns?: number[];
+  /** 不用这些探针（以前的结果里一直到不了目标，见 failedProbes）。 */
+  excludeProbes?: number[];
+  /** 跳过这些已经测到过的「起点地区|区域」组合（见 pairKey）。 */
+  skip?: Set<string>;
 }
 
 export interface PlannedMeasurement {
@@ -56,9 +60,9 @@ export function median(xs: number[]): number {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-/** 离地区中心最近的 k 个探针：优先稳定在线的，尽量覆盖不同运营商（ASN），跳过 excludeAsns 里的网络。 */
-export function chooseProbes(cell: BatchCell, k: number, excludeAsns: number[] = []): BatchProbe[] {
-  const sorted = cell.probes.filter((p) => !excludeAsns.includes(p.asn)).sort(
+/** 离地区中心最近的 k 个探针：优先稳定在线的，尽量覆盖不同运营商（ASN），跳过 excludeAsns 里的网络和 excludeProbes 里的探针。 */
+export function chooseProbes(cell: BatchCell, k: number, excludeAsns: number[] = [], excludeProbes: number[] = []): BatchProbe[] {
+  const sorted = cell.probes.filter((p) => !excludeAsns.includes(p.asn) && !excludeProbes.includes(p.id)).sort(
     (a, b) => Number(b.stable) - Number(a.stable) || haversineKm(cell.lat, cell.lng, a.lat, a.lng) - haversineKm(cell.lat, cell.lng, b.lat, b.lng),
   );
   const picked: BatchProbe[] = [];
@@ -93,13 +97,32 @@ export function nearestTargets(cell: { lat: number; lng: number }, targets: Batc
   return out;
 }
 
+export const pairKey = (cell: string, region: string) => `${cell}|${region}`;
+
+/**
+ * 以前的结果里，某种协议测过至少 2 次却一次都没到达目标的探针。
+ * 多半是探针所在网络拦了这种 traceroute（常见于 TCP 443），再选它只会白花积分。
+ */
+export function failedProbes(results: { probe: number; protocol: 'ICMP' | 'TCP'; rtt: number | null }[]): number[] {
+  const tally = new Map<string, { probe: number; n: number; ok: number }>();
+  for (const r of results) {
+    const key = `${r.probe}|${r.protocol}`;
+    const t = tally.get(key) ?? { probe: r.probe, n: 0, ok: 0 };
+    t.n++;
+    if (r.rtt !== null) t.ok++;
+    tally.set(key, t);
+  }
+  return [...new Set([...tally.values()].filter((t) => t.n >= 2 && t.ok === 0).map((t) => t.probe))].sort((a, b) => a - b);
+}
+
 /** 按目标区域分组：每个区域一个测量，探针来自所有把它列为目标的起点地区（超过 1000 个时拆开）。 */
 export function plan(cells: BatchCell[], targets: BatchTarget[], opts: PlanOptions): PlannedMeasurement[] {
   const byRegion = new Map<string, PlannedMeasurement>();
   for (const cell of cells) {
-    const probes = chooseProbes(cell, opts.probes, opts.excludeAsns);
+    const probes = chooseProbes(cell, opts.probes, opts.excludeAsns, opts.excludeProbes);
     if (!probes.length) continue;
     for (const target of nearestTargets(cell, targets, opts.nearest)) {
+      if (opts.skip?.has(pairKey(cell.id, target.region))) continue;
       const m = byRegion.get(target.region) ?? { target, probes: [] };
       for (const probe of probes) m.probes.push({ probe, cell: cell.id });
       byRegion.set(target.region, m);

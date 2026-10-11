@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chooseProbes, nearestTargets, plan, planCost, type BatchCell, type BatchProbe, type BatchTarget } from './batch-plan.ts';
+import { chooseProbes, failedProbes, nearestTargets, pairKey, plan, planCost, type BatchCell, type BatchProbe, type BatchTarget } from './batch-plan.ts';
 
 const probe = (id: number, asn: number, lat: number, lng: number, stable = true): BatchProbe => ({ id, asn, lat, lng, cc: 'US', stable });
 const target = (region: string, provider: string, lat: number, lng: number): BatchTarget => ({
@@ -26,6 +26,10 @@ describe('chooseProbes', () => {
 
   it('skips probes inside excluded networks', () => {
     expect(chooseProbes(cell, 2, [701]).map((p) => p.id)).toEqual([3, 4]);
+  });
+
+  it('skips excluded probes', () => {
+    expect(chooseProbes(cell, 2, [], [1]).map((p) => p.id)).toEqual([2, 3]);
   });
 
   it('fills with same-ASN probes when there are too few networks', () => {
@@ -63,5 +67,29 @@ describe('plan', () => {
 
   it('measures every region with nearest = all', () => {
     expect(planCost(plan(cells, targets, { nearest: 'all', probes: 1 })).results).toBe(8);
+  });
+
+  it('skips pairs that were already measured', () => {
+    const ms = plan(cells, targets, { nearest: 1, probes: 2, skip: new Set([pairKey('US-NJ', 'aws:us-east-1'), pairKey('IE', 'gcp:europe-west1')]) });
+    expect(ms.map((m) => m.target.region).sort()).toEqual(['aws:eu-west-1', 'gcp:us-east4']);
+    expect(planCost(ms).results).toBe(3);
+  });
+});
+
+describe('failedProbes', () => {
+  it('flags probes that never reached a target over one protocol', () => {
+    const r = (probe: number, protocol: 'ICMP' | 'TCP', rtt: number | null) => ({ probe, protocol, rtt });
+    expect(
+      failedProbes([
+        // 1：TCP 全部失败，ICMP 正常
+        r(1, 'TCP', null), r(1, 'TCP', null), r(1, 'ICMP', 20),
+        // 2：TCP 只失败一次
+        r(2, 'TCP', null), r(2, 'TCP', 30),
+        // 3：只测过一次，失败
+        r(3, 'ICMP', null),
+        // 4：全部失败
+        r(4, 'TCP', null), r(4, 'TCP', null), r(4, 'ICMP', null),
+      ]),
+    ).toEqual([1, 4]);
   });
 });
