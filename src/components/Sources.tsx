@@ -5,13 +5,18 @@ import type { RouteTab } from './Panel.tsx';
 /** 三类延迟/路由数据：模型估算、站长实测、锚点参考。颜色和名称在列表、tab、说明里保持一致。 */
 export type SourceId = RouteTab;
 
-/** 每个数据来源页面顶部的来源说明（同色竖条 + 标题 + 一句话出处）。 */
+/** 每个数据来源页面顶部的来源说明：标题（同色）始终可见，出处说明点开再看。 */
 export function SourceBanner({ source, title, children }: { source: SourceId; title: string; children: ReactNode }) {
+  const { t } = useI18n();
   return (
-    <div className={`source-banner src-${source}`}>
-      <b>{title}</b>
+    <details className={`source-note src-${source}`}>
+      <summary>
+        <span className="src-swatch" aria-hidden="true" />
+        <b>{title}</b>
+        <span className="source-note-why">{t('src.why')}</span>
+      </summary>
       <p>{children}</p>
-    </div>
+    </details>
   );
 }
 

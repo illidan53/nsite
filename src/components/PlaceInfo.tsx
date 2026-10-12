@@ -38,9 +38,9 @@ function tzText(zone: string, lang: Lang) {
   return { offset: offset === 'UTC' ? 'UTC+0' : offset, time };
 }
 
-/** 点击位置的概况：省、国家（带国旗）、时区、RIPE Atlas 在线探针数、人口、气候。 */
+/** 点击位置的概况卡片：当地时间（时区）、人口、气候、RIPE Atlas 在线探针数。省和国家名在窗口标题里。 */
 export default function PlaceInfo({ origin, place }: Props) {
-  const { lang, t, pick } = useI18n();
+  const { lang, t } = useI18n();
   const [zone, setZone] = useState<string | null>(null);
   const [probes, setProbes] = useState<{ province: number | null; country: number } | null>(null);
   const [climate, setClimate] = useState<KoppenClass | null | undefined>(undefined);
@@ -92,48 +92,66 @@ export default function PlaceInfo({ origin, place }: Props) {
   }, []);
 
   const tz = zone ? tzText(zone, lang) : null;
-  const rows: [string, ReactNode][] = [
-    [t('info.province'), admin1 ? `${pick(admin1.name, admin1.nameZh)}${lang === 'zh' && admin1.nameZh ? ` · ${admin1.name}` : ''}` : '—'],
-    [
-      t('info.country'),
-      country ? `${pick(country.name, country.nameZh)}${lang === 'zh' && country.nameZh ? ` · ${country.name}` : ''}` : '—',
-    ],
-    [t('info.timezone'), tz ? `${zone} · ${tz.offset} · ${t('info.localTime', { time: tz.time })}` : '…'],
-    [
-      t('info.probes'),
-      !country
-        ? '—'
-        : probes
+  const pending = '…';
+  const facts: { key: string; label: string; value: ReactNode; sub?: ReactNode; title?: string }[] = [
+    {
+      key: 'time',
+      label: t('fact.localTime'),
+      value: tz ? tz.time : zone === null ? pending : '—',
+      sub: tz ? `${tz.offset} · ${zone}` : undefined,
+      title: t('info.timezone'),
+    },
+    {
+      key: 'pop',
+      label: t('info.population'),
+      value: admin1?.pop ? fmtPop(admin1.pop, lang) : country?.pop ? fmtPop(country.pop, lang) : '—',
+      sub: admin1?.pop
+        ? t('fact.popSubProvince', {
+            year: admin1.popYear ?? '?',
+            country: country?.pop ? fmtPop(country.pop, lang) : '—',
+            cyear: country?.popYear ?? '?',
+          })
+        : country?.pop
+          ? t('fact.popSubCountry', { year: country.popYear ?? '?' })
+          : undefined,
+    },
+    {
+      key: 'climate',
+      label: t('info.climate'),
+      value: climate === undefined ? pending : climate ? climate.code : '—',
+      sub: climate ? climate[lang] : undefined,
+    },
+    {
+      key: 'probes',
+      label: t('fact.probes'),
+      title: t('info.probes'),
+      value: !country ? '—' : probes ? (probes.province ?? probes.country).toLocaleString() : pending,
+      sub:
+        country && probes
           ? probes.province !== null
-            ? t('info.probesValue', { province: probes.province, country: probes.country })
-            : t('info.probesCountry', { country: probes.country })
-          : '…',
-    ],
-    [
-      t('info.population'),
-      [
-        admin1?.pop ? t('info.popProvince', { n: fmtPop(admin1.pop, lang), year: admin1.popYear ?? '?' }) : null,
-        country?.pop ? t('info.popCountry', { n: fmtPop(country.pop, lang), year: country.popYear ?? '?' }) : null,
-      ]
-        .filter(Boolean)
-        .join(' · ') || '—',
-    ],
-    [t('info.climate'), climate === undefined ? '…' : climate ? `${climate.code} · ${climate[lang]}` : '—'],
+            ? t('fact.probesSubProvince', { country: probes.country.toLocaleString() })
+            : t('fact.probesSubCountry')
+          : undefined,
+    },
   ];
 
   return (
-    <div className="place-info">
-      <table>
-        <tbody>
-          {rows.map(([k, v]) => (
-            <tr key={k}>
-              <th scope="row">{k}</th>
-              <td>{v}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="muted place-info-src">{t('info.sources')}</p>
-    </div>
+    <dl className="facts">
+      {facts.map((f) => (
+        <div key={f.key} className="fact">
+          <dt className="fact-label" title={f.title ?? f.label}>
+            {f.label}
+          </dt>
+          <dd>
+            <span className="fact-value">{f.value}</span>
+            {f.sub && (
+              <span className="fact-sub" title={typeof f.sub === 'string' ? f.sub : undefined}>
+                {f.sub}
+              </span>
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }

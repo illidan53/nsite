@@ -15,6 +15,16 @@ export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: numb
 }
 
 /** 折线（[lng, lat] 序列）的大圆长度。 */
+/** 从 a 出发沿大圆走向 b 的初始方位角（度，正北为 0，顺时针）。 */
+export function bearingDeg(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const φ1 = toRad(a.lat);
+  const φ2 = toRad(b.lat);
+  const Δλ = toRad(b.lng - a.lng);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
 export function polylineKm(coords: LngLat[]): number {
   let km = 0;
   for (let i = 1; i < coords.length; i++) {

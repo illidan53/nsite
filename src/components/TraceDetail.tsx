@@ -197,68 +197,70 @@ export default function TraceDetail({ probe, trace, target, onOverlay }: Props) 
   return (
     <>
       {!trace.reached && <p className="muted">{t('atlas.unreached')}</p>}
-      <table className="hops">
-        <thead>
-          <tr>
-            <th>{t('atlas.colHop')}</th>
-            <th>{t('atlas.colRouter')}</th>
-            <th>{t('atlas.colLoc')}</th>
-            <th className="num">RTT</th>
-            <th className="num">Δ</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(({ h, loc, ok, net, place, delta }) => {
-            const leg = legByHop.get(h.hop);
-            const legLine = leg?.leg && leg.leg.kind !== 'direct' ? legText(leg.leg, t) : '';
-            return (
-              <tr key={h.hop} className={h.ip ? '' : 'timeout'}>
-                <td>{h.hop}</td>
-                <td>
-                  {h.ip ? <span className="mono">{h.ip}</span> : <span className="muted">* * *</span>}
-                  {h.isPrivate && <span className="muted"> {t('atlas.private')}</span>}
-                  {net?.asn && (
-                    <div className="hop-net">
-                      AS{net.asn} {shortHolder(net.holder)}
-                    </div>
-                  )}
-                </td>
-                <td>
-                  {place?.inferredFrom !== undefined ? (
-                    <span
-                      className="loc-inferred"
-                      title={place.inferredFrom === 'probe' ? t('atlas.inferredProbe') : t('atlas.inferred', { hop: place.inferredFrom })}
-                    >
-                      ≈ {place.inferredFrom === 'probe' ? t('atlas.nearProbe') : `${place.city}${place.country ? `, ${place.country}` : ''}`}
-                    </span>
-                  ) : loc ? (
-                    <span className={ok ? '' : 'loc-bad'} title={ok ? undefined : t('atlas.badLoc')}>
-                      {loc.city}
-                      {loc.country ? `, ${loc.country}` : ''}
-                    </span>
-                  ) : place ? (
-                    <span>{place.city}</span>
-                  ) : h.ip && !h.isPrivate && !enriched ? (
-                    '…'
-                  ) : (
-                    '—'
-                  )}
-                  {legLine && (
-                    <div
-                      className={`hop-leg hop-leg-${leg!.leg!.kind}`}
-                      title={leg!.delta !== null ? t('atlas.legTitle', { delta: fmtMs(leg!.delta), floor: fmtMs(leg!.leg!.rttMs) }) : t('atlas.legTitleNoDelta')}
-                    >
-                      ↳ {legLine}
-                    </div>
-                  )}
-                </td>
-                <td className="num">{h.minRtt !== null ? fmtMs(h.minRtt) : ''}</td>
-                <td className={`num ${delta !== null && delta > 15 ? 'jump' : ''}`}>{delta !== null ? fmtDelta(delta) : ''}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div className="table-scroll" tabIndex={0} role="region" aria-label={t('atlas.hopTable')}>
+        <table className="hops">
+          <thead>
+            <tr>
+              <th>{t('atlas.colHop')}</th>
+              <th>{t('atlas.colRouter')}</th>
+              <th>{t('atlas.colLoc')}</th>
+              <th className="num">RTT</th>
+              <th className="num">Δ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ h, loc, ok, net, place, delta }) => {
+              const leg = legByHop.get(h.hop);
+              const legLine = leg?.leg && leg.leg.kind !== 'direct' ? legText(leg.leg, t) : '';
+              return (
+                <tr key={h.hop} className={h.ip ? '' : 'timeout'}>
+                  <td>{h.hop}</td>
+                  <td>
+                    {h.ip ? <span className="mono">{h.ip}</span> : <span className="muted">* * *</span>}
+                    {h.isPrivate && <span className="muted"> {t('atlas.private')}</span>}
+                    {net?.asn && (
+                      <div className="hop-net">
+                        AS{net.asn} {shortHolder(net.holder)}
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    {place?.inferredFrom !== undefined ? (
+                      <span
+                        className="loc-inferred"
+                        title={place.inferredFrom === 'probe' ? t('atlas.inferredProbe') : t('atlas.inferred', { hop: place.inferredFrom })}
+                      >
+                        ≈ {place.inferredFrom === 'probe' ? t('atlas.nearProbe') : `${place.city}${place.country ? `, ${place.country}` : ''}`}
+                      </span>
+                    ) : loc ? (
+                      <span className={ok ? '' : 'loc-bad'} title={ok ? undefined : t('atlas.badLoc')}>
+                        {loc.city}
+                        {loc.country ? `, ${loc.country}` : ''}
+                      </span>
+                    ) : place ? (
+                      <span>{place.city}</span>
+                    ) : h.ip && !h.isPrivate && !enriched ? (
+                      '…'
+                    ) : (
+                      '—'
+                    )}
+                    {legLine && (
+                      <div
+                        className={`hop-leg hop-leg-${leg!.leg!.kind}`}
+                        title={leg!.delta !== null ? t('atlas.legTitle', { delta: fmtMs(leg!.delta), floor: fmtMs(leg!.leg!.rttMs) }) : t('atlas.legTitleNoDelta')}
+                      >
+                        ↳ {legLine}
+                      </div>
+                    )}
+                  </td>
+                  <td className="num">{h.minRtt !== null ? fmtMs(h.minRtt) : ''}</td>
+                  <td className={`num ${delta !== null && delta > 15 ? 'jump' : ''}`}>{delta !== null ? fmtDelta(delta) : ''}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
       <p className="muted small">{t('atlas.footnote')}</p>
     </>
   );

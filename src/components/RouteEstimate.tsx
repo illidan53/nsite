@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useI18n } from '../lib/i18n.tsx';
 import { endName } from '../lib/names.ts';
 import { ACCESS_RTT_MS, FIBER_KM_PER_MS, LAND_INFLATION, type EstimatedRoute, type Segment } from '../lib/routing.ts';
@@ -46,15 +46,57 @@ export default function RouteEstimate({ route, onHover }: Props) {
   const { lang, t } = useI18n();
   const groups = useMemo(() => (route ? groupSegments(route.segments) : []), [route]);
   const [open, setOpen] = useState<number | null>(null);
+  /** 延迟构成条和时间线里同时高亮的那一组。 */
+  const [hot, setHot] = useState<number | null>(null);
+  const items = useRef<(HTMLLIElement | null)[]>([]);
   const name = (e: Segment['from']) => endName(e, lang, t);
 
   if (!route) {
     return <p className="muted">{t('est.unreachable')}</p>;
   }
 
+  const enter = (gi: number) => {
+    setHot(gi);
+    onHover([groups[gi].start, groups[gi].end]);
+  };
+  const leave = () => {
+    setHot(null);
+    onHover(null);
+  };
+  const pathOf = (g: Group) => (g.kind === 'access' ? t('est.access', { ms: ACCESS_RTT_MS }) : `${name(g.segments[0].from)} → ${name(g.segments[g.segments.length - 1].to)}`);
   const subCount = route.segments.filter((s) => s.kind === 'sub').length;
   return (
     <div className="route-estimate">
+      <div className="latency-ribbon">
+        <div className="ribbon-head">
+          <span className="summary-label">{t('route.budget')}</span>
+          <b>{fmtMs(route.rttMs)} ms</b>
+        </div>
+        <div className="ribbon-bar">
+          {groups.map((g, gi) => (
+            <button
+              key={gi}
+              className={`rib-seg rib-${g.kind} ${hot === gi ? 'is-hot' : ''}`}
+              style={{ flex: `${g.rttMs} 1 0` }}
+              aria-label={t('route.segment', { kind: t(KIND_KEY[g.kind]), path: pathOf(g), ms: fmtMs(g.rttMs), total: fmtMs(g.cumulativeMs) })}
+              title={`${t(KIND_KEY[g.kind])} · ${pathOf(g)}`}
+              onMouseEnter={() => enter(gi)}
+              onMouseLeave={leave}
+              onFocus={() => enter(gi)}
+              onBlur={leave}
+              onClick={() => {
+                const el = items.current[gi];
+                el?.scrollIntoView({ block: 'nearest' });
+                el?.focus({ preventScroll: true });
+              }}
+            >
+              {/* 太窄的段只留颜色，数值在提示和读屏标签里 */}
+              {g.rttMs / route.rttMs >= 0.1 ? `+${fmtMs(g.rttMs)}` : ''}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="summary-grid">
         <div>
           <span className="summary-label">{t('est.rtt')}</span>
@@ -83,9 +125,15 @@ export default function RouteEstimate({ route, onHover }: Props) {
           return (
             <li
               key={gi}
-              className={`tl-item tl-${g.kind}`}
-              onMouseEnter={() => onHover([g.start, g.end])}
-              onMouseLeave={() => onHover(null)}
+              ref={(el) => {
+                items.current[gi] = el;
+              }}
+              className={`tl-item tl-${g.kind} ${hot === gi ? 'is-hot' : ''}`}
+              tabIndex={0}
+              onMouseEnter={() => enter(gi)}
+              onMouseLeave={leave}
+              onFocus={(e) => e.target === e.currentTarget && enter(gi)}
+              onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && leave()}
             >
               <div className="tl-head">
                 <span className="tl-kind">{t(KIND_KEY[g.kind])}</span>
@@ -124,7 +172,12 @@ export default function RouteEstimate({ route, onHover }: Props) {
                   {expandable && open === gi && (
                     <ol className="tl-hops">
                       {g.segments.map((s, i) => (
-                        <li key={i} onMouseEnter={() => onHover([g.start + i, g.start + i])}>
+                        <li
+                          key={i}
+                          tabIndex={0}
+                          onMouseEnter={() => onHover([g.start + i, g.start + i])}
+                          onFocus={() => onHover([g.start + i, g.start + i])}
+                        >
                           <span>
                             {name(s.from)} → {name(s.to)}
                           </span>

@@ -62,7 +62,10 @@ interface Props {
   target: Region | null;
   camera: CameraTarget | null;
   offset: [number, number];
-  onPick: (lat: number, lng: number) => void;
+  /** 系统设置了“减少动态效果”：路线虚线不再流动。 */
+  reducedMotion: boolean;
+  /** at：点击处的屏幕坐标（选择窗口从这里放大弹出）。 */
+  onPick: (lat: number, lng: number, at?: { x: number; y: number }) => void;
   onRegionClick: (region: Region) => void;
 }
 
@@ -90,6 +93,7 @@ const pathAlt = (d: object) => (isTrace(d) ? 0.007 : isRoute(d) ? 0.006 : 0.003)
 const pathDashLength = (d: object) => (isCable(d) ? 1 : 0.08);
 const pathDashGap = (d: object) => (isCable(d) ? 0 : 0.02);
 const pathDashAnimate = (d: object) => (isCable(d) ? 0 : 2500);
+const pathDashStill = () => 0;
 const pointColor = (d: object) => PROVIDER_BY_ID[(d as Region).provider].color;
 /** 实测路径的颜色（与面板里“站长实测”“锚点参考”一致），浅色界面用深一档。 */
 const TRACE_COLORS = { mine: { light: '#059669', dark: '#34d399' }, atlas: { light: '#7c3aed', dark: '#a78bfa' } } as const;
@@ -109,7 +113,7 @@ const htmlElement = (d: object) => {
 function GlobeView(props: Props) {
   const { theme, countries, land, cables, showCables, showPlanned, regions, origin, you, autoRotate, route, activeRange, trace, traceSource, target } =
     props;
-  const { camera, offset, onPick, onRegionClick } = props;
+  const { camera, offset, reducedMotion, onPick, onRegionClick } = props;
   const { lang, t } = useI18n();
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
   const { w, h } = useWindowSize();
@@ -157,8 +161,8 @@ function GlobeView(props: Props) {
     const provinces = expandedKey.split(',').flatMap((iso) => admin1.get(iso) ?? []);
     // 防重叠：按面积从大到小放置，和已放置的标签在屏幕上相交就跳过
     const globe = globeRef.current;
-    // 左上角 HUD 和打开的侧边栏所在区域不放省名，避免文字叠在面板上
-    const placed: [number, number, number, number][] = [...document.querySelectorAll('.hud > *, .panel-open')].map((el) => {
+    // 左上角 HUD、打开的侧边栏、路线卡和底部小条所在区域不放省名，避免文字叠在面板上
+    const placed: [number, number, number, number][] = [...document.querySelectorAll('.hud > *, .panel-open, [data-label-avoid]')].map((el) => {
       const r = el.getBoundingClientRect();
       return [r.left - 4, r.top - 4, r.right + 4, r.bottom + 4];
     });
@@ -315,10 +319,13 @@ function GlobeView(props: Props) {
   const pointScale = pov.altitude < 0.25 ? 0.12 : pov.altitude < 0.6 ? 0.3 : pov.altitude < 1.2 ? 0.6 : 1;
   const pointAltitude = useCallback((d: object) => ((d as Region).id === targetId ? 0.08 : 0.025) * pointScale, [targetId, pointScale]);
   const pointRadius = useCallback((d: object) => ((d as Region).id === targetId ? 0.45 : 0.22) * pointScale, [targetId, pointScale]);
-  const handleGlobeClick = useCallback(({ lat, lng }: { lat: number; lng: number }) => onPick(lat, lng), [onPick]);
+  const handleGlobeClick = useCallback(
+    ({ lat, lng }: { lat: number; lng: number }, e: MouseEvent) => onPick(lat, lng, { x: e.clientX, y: e.clientY }),
+    [onPick],
+  );
   // 点到国家多边形、点阵或海缆线上时，globe 不会触发 onGlobeClick，这里同样当作选点。
   const handleObjectClick = useCallback(
-    (_p: object, _e: MouseEvent, { lat, lng }: { lat: number; lng: number }) => onPick(lat, lng),
+    (_p: object, e: MouseEvent, { lat, lng }: { lat: number; lng: number }) => onPick(lat, lng, { x: e.clientX, y: e.clientY }),
     [onPick],
   );
   const handlePointClick = useCallback((d: object) => onRegionClick(d as Region), [onRegionClick]);
@@ -372,7 +379,7 @@ function GlobeView(props: Props) {
       pathStroke={pathStroke}
       pathDashLength={pathDashLength}
       pathDashGap={pathDashGap}
-      pathDashAnimateTime={pathDashAnimate}
+      pathDashAnimateTime={reducedMotion ? pathDashStill : pathDashAnimate}
       pathLabel={pathLabel}
       pointsData={regions}
       pointLat="lat"

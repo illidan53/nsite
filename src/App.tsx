@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import GlobeView, { type CameraTarget, type TraceOverlay } from './components/GlobeView.tsx';
 import Panel, { type RouteTab } from './components/Panel.tsx';
 import TargetsPanel from './components/TargetsPanel.tsx';
@@ -7,26 +7,19 @@ import { whoami } from './lib/api.ts';
 import { loadAppData, type AppData } from './lib/data.ts';
 import { RouteGraphContext } from './lib/graphContext.ts';
 import { bestRtt, loadMeasured, measuredOriginFor } from './lib/measured.ts';
-import { haversineKm, interpolateGreatCircle } from './lib/geo.ts';
+import { haversineKm } from './lib/geo.ts';
 import { useI18n, type Lang } from './lib/i18n.tsx';
+import { placeLayout, routeCamera, type Sheet, type Stage } from './lib/layout.ts';
 import { providerName } from './lib/names.ts';
 import { lookupCountry, lookupPlace, type Place } from './lib/places.ts';
 import { PROVIDERS } from './lib/providers.ts';
 import { estimateRtt, routeTo, shortestFrom } from './lib/routing.ts';
 import { THEMES, THEME_IDS, initialTheme, saveTheme, type ThemeId } from './lib/themes.ts';
 import type { MeasuredData, ProviderId, Region, TargetsData } from './lib/types.ts';
-import { useWindowSize } from './lib/useWindowSize.ts';
+import { usePrefersReducedMotion, useWindowSize } from './lib/useWindowSize.ts';
 import { fetchViewerLocation, viewerLabel, type ViewerLocation } from './lib/viewer.ts';
 
-const PANEL_WIDTH = 440;
-const MOBILE_BREAKPOINT = 768;
 const THEME_KEY = { midnight: 'theme.midnight', night: 'theme.night', marble: 'theme.marble', dots: 'theme.dots', light: 'theme.light' } as const;
-
-function routeCamera(from: { lat: number; lng: number }, to: { lat: number; lng: number }): CameraTarget {
-  const km = haversineKm(from.lat, from.lng, to.lat, to.lng);
-  const [lng, lat] = interpolateGreatCircle([from.lng, from.lat], [to.lng, to.lat], 0.5);
-  return { lat, lng, altitude: Math.min(3.2, Math.max(1.4, 1.1 + km / 5000)) };
-}
 
 export default function App() {
   const { lang, setLang, t } = useI18n();
@@ -49,9 +42,28 @@ export default function App() {
   const [ipSel, setIpSel] = useState<string | null>(null);
   const [owner, setOwner] = useState(false);
   const [measured, setMeasured] = useState<MeasuredData | null>(null);
+  /** 选择窗口收起成底部小条。 */
+  const [minimized, setMinimized] = useState(false);
+  /** 底部路线抽屉：半屏 / 全屏。 */
+  const [sheet, setSheet] = useState<Sheet>('peek');
+  /** 打开选择窗口的点击位置（屏幕坐标）。 */
+  const [openFrom, setOpenFrom] = useState<{ x: number; y: number } | null>(null);
+  /** 在路线页点了新起点时，刚才看的数据中心。 */
+  const [recent, setRecent] = useState<Region | null>(null);
   const { w, h } = useWindowSize();
+  const reduced = usePrefersReducedMotion();
   const pickSeq = useRef(0);
+  const targetRef = useRef<Region | null>(null);
+  targetRef.current = target;
+  const originRef = useRef<{ lat: number; lng: number } | null>(null);
+  originRef.current = origin;
   const theme = THEMES[themeId];
+  /** 系统要求减少动态效果时镜头直接跳过去。 */
+  const cam = useCallback((c: CameraTarget): CameraTarget => (reduced ? { ...c, ms: 0 } : c), [reduced]);
+  const routeView = useCallback(
+    (from: { lat: number; lng: number }, to: Region) => cam(routeCamera(from, to, placeLayout(w, h, 'route', 'peek').free, h)),
+    [cam, w, h],
+  );
 
   useEffect(() => {
     loadAppData().then(setData, (err: Error) => setLoadError(err.message));
@@ -89,37 +101,42 @@ export default function App() {
       }))
       .sort((a, b) => a.rttMs - b.rttMs);
   }, [data, origin, sp, measuredOrigin]);
-  const nearby = useMemo(() => rankedAll.filter((r) => enabled.has(r.region.provider)), [rankedAll, enabled]);
 
   const route = useMemo(() => (data && sp && target ? routeTo(data.graph, sp, target) : null), [data, sp, target]);
 
   const pick = useCallback(
-    (lat: number, lng: number) => {
+    (lat: number, lng: number, at?: { x: number; y: number }) => {
       if (!data) return;
       setIpsOpen(false);
       setOrigin({ lat, lng });
+      setRecent(targetRef.current);
       setTarget(null);
+      setMinimized(false);
+      setSheet('peek');
+      setOpenFrom(at ?? null);
       setOverlay(null);
       setActiveRange(null);
       setPlace({ country: lookupCountry(data.countries, lat, lng), admin1: null });
-      setCamera({ lat, lng, altitude: 1.9 });
+      setCamera(cam({ lat, lng, altitude: 1.9 }));
       const seq = ++pickSeq.current;
       lookupPlace(data.countries, lat, lng).then((p) => {
         if (seq === pickSeq.current) setPlace(p);
       });
     },
-    [data],
+    [data, cam],
   );
 
   const selectRegion = useCallback(
     (r: Region | null) => {
       setTarget(r);
+      setMinimized(false);
+      setRecent(null);
       setOverlay(null);
       setActiveRange(null);
-      if (r && origin) setCamera(routeCamera(origin, r));
-      else if (origin) setCamera({ ...origin, altitude: 1.9 });
+      if (r && origin) setCamera(routeView(origin, r));
+      else if (origin) setCamera(cam({ ...origin, altitude: 1.9 }));
     },
-    [origin],
+    [origin, routeView, cam],
   );
 
   // 首次载入：URL 深链接优先；否则按访问者 IP 的大致位置稍微拉近。
@@ -136,7 +153,7 @@ export default function App() {
         setTarget(r);
         const tabParam = q.get('tab');
         setTab(tabParam === 'atlas' || tabParam === 'mine' ? tabParam : 'estimate');
-        setCamera(routeCamera({ lat, lng }, r));
+        setCamera(routeView({ lat, lng }, r));
       }
     }
     fetch('/data/targets.json')
@@ -146,11 +163,13 @@ export default function App() {
         setIpsData(d);
         if (q.has('ips')) {
           setIpsOpen(true);
+          // 和 openIps 一样：有地点、没有路线时先收起，关掉 IP 面板后回到底部小条
+          if (deepLink && !data.network.regions.some((x) => x.id === q.get('dc'))) setMinimized(true);
           const id = q.get('ip');
           const r = id ? data.network.regions.find((x) => x.id === id) : undefined;
           if (r && d.targets.some((x) => x.region === r.id)) {
             setIpSel(r.id);
-            setCamera({ lat: r.lat, lng: r.lng, altitude: 1.6 });
+            setCamera(cam({ lat: r.lat, lng: r.lng, altitude: 1.6 }));
           }
         }
       })
@@ -159,7 +178,8 @@ export default function App() {
     fetchViewerLocation(ctrl.signal).then((v) => {
       if (!v) return;
       setViewer(v);
-      if (!deepLink && !q.has('ips')) setCamera({ lat: v.lat, lng: v.lng, altitude: 1.7, ms: 2400 });
+      // 位置返回得晚时用户可能已经点了地球，不再把镜头拉走
+      if (!deepLink && !q.has('ips') && !originRef.current) setCamera(cam({ lat: v.lat, lng: v.lng, altitude: 1.7, ms: 2400 }));
     });
     return () => ctrl.abort();
     // 只在数据首次就绪时执行一次
@@ -188,15 +208,17 @@ export default function App() {
     (id: string | null) => {
       setIpSel(id);
       const r = id ? regionById.get(id) : null;
-      if (r) setCamera({ lat: r.lat, lng: r.lng, altitude: 1.6 });
+      if (r) setCamera(cam({ lat: r.lat, lng: r.lng, altitude: 1.6 }));
     },
-    [regionById],
+    [regionById, cam],
   );
 
   const openIps = useCallback(() => {
     setIpsOpen(true);
     setIpSel(null);
-  }, []);
+    // 从选择窗口打开时先收起，关掉 IP 面板后回到底部小条，不会突然又弹出窗口
+    if (origin && !target) setMinimized(true);
+  }, [origin, target]);
 
   const onRegionClick = useCallback(
     (r: Region) => {
@@ -212,11 +234,19 @@ export default function App() {
     setTarget(null);
     setOverlay(null);
     setPlace(null);
+    setMinimized(false);
+    setRecent(null);
   }, []);
+  const minimize = useCallback(() => setMinimized(true), []);
+  const restore = useCallback(() => setMinimized(false), []);
+  const recenter = useCallback(() => {
+    if (origin && target) setCamera(routeView(origin, target));
+  }, [origin, target, routeView]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+      // 搜索框里的 Esc 先清空搜索词（已 preventDefault）
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
       if (ipsOpen) {
         if (ipSel) setIpSel(null);
         else setIpsOpen(false);
@@ -227,12 +257,22 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [ipsOpen, ipSel, target, selectRegion, close]);
 
-  const mobile = w < MOBILE_BREAKPOINT;
-  const panelOpen = Boolean(origin) || ipsOpen;
-  const offset = useMemo<[number, number]>(
-    () => (!panelOpen ? [0, 0] : mobile ? [0, -h * 0.28] : [-PANEL_WIDTH / 2, 0]),
-    [panelOpen, mobile, h],
-  );
+  const stage: Stage = ipsOpen ? 'ips' : !origin ? 'idle' : target ? 'route' : minimized ? 'minimized' : 'overview';
+  const layout = useMemo(() => placeLayout(w, h, stage, sheet), [w, h, stage, sheet]);
+  const { mobile, dock } = layout;
+  const [ox, oy] = layout.offset;
+  const offset = useMemo<[number, number]>(() => [ox, oy], [ox, oy]);
+  const modal = stage === 'overview';
+  /** 手机上选择窗口、路线和 IP 面板打开时 HUD 让位（也不能被 Tab 到）。 */
+  const hudHidden = mobile && (stage === 'overview' || stage === 'route' || stage === 'ips');
+
+  const stageRef = useRef(stage);
+  stageRef.current = stage;
+  // 路线页里转屏或缩放窗口导致停靠方式变化时，重新取景（IP 面板打开时不动镜头）
+  useEffect(() => {
+    if (stageRef.current === 'route' && origin && targetRef.current) setCamera({ ...routeView(origin, targetRef.current), ms: reduced ? 0 : 600 });
+    // 只在停靠方式变化时执行
+  }, [dock, mobile]);
 
   const toggleProvider = (id: ProviderId) =>
     setEnabled((prev) => {
@@ -266,8 +306,13 @@ export default function App() {
 
   const onLand = Boolean(sp);
   return (
-    <div className="app" style={{ background: theme.background }}>
-      <div className="globe-layer">
+    <div
+      className="app"
+      data-stage={stage}
+      data-dock={dock}
+      style={{ background: theme.background, '--card-w': `${layout.cardW}px`, '--sheet-h': `${layout.sheetPx}px` } as CSSProperties}
+    >
+      <div className="globe-layer" inert={modal} tabIndex={-1} role="region" aria-label={t('fw.globe')}>
       <GlobeView
         theme={theme}
         countries={data.countries}
@@ -278,7 +323,7 @@ export default function App() {
         regions={ipsOpen ? ipRegions : regions}
         origin={origin}
         you={viewer}
-        autoRotate={!origin && !viewer && !ipsOpen}
+        autoRotate={!origin && !viewer && !ipsOpen && !reduced}
         route={!ipsOpen && tab === 'estimate' ? route : null}
         activeRange={activeRange}
         trace={!ipsOpen && tab !== 'estimate' ? overlay : null}
@@ -286,16 +331,17 @@ export default function App() {
         target={ipsOpen ? (ipSel ? regionById.get(ipSel) ?? null : null) : target}
         camera={camera}
         offset={offset}
+        reducedMotion={reduced}
         onPick={pick}
         onRegionClick={onRegionClick}
       />
       </div>
 
-      <div className={`hud ${panelOpen && mobile ? 'hud-hidden' : ''}`}>
+      <div className={`hud ${hudHidden ? 'hud-hidden' : ''}`} inert={modal || hudHidden}>
         <h1>
           Net Globe <span>{t('app.title')}</span>
         </h1>
-        <p className="hint">{t(origin ? 'hud.hintActive' : 'hud.hintIdle')}</p>
+        <p className="hint">{t(stage === 'route' ? 'hud.hintRoute' : origin ? 'hud.hintActive' : 'hud.hintIdle')}</p>
         {viewer && !origin && (
           <p className="you-hint">
             <span className="you-dot" aria-hidden="true" />
@@ -366,11 +412,13 @@ export default function App() {
 
       <RouteGraphContext value={data.graph}>
       <Panel
-        open={Boolean(origin) && !ipsOpen}
+        stage={stage}
+        layout={layout}
+        sheet={sheet}
         origin={origin}
         place={place}
         onLand={onLand}
-        nearby={nearby}
+        enabled={enabled}
         measuredData={measured}
         measuredOrigin={measuredOrigin}
         all={rankedAll}
@@ -380,15 +428,21 @@ export default function App() {
         anchorProbes={data.network.anchorProbes}
         publicTarget={target ? ipsData?.targets.find((x) => x.region === target.id) : undefined}
         owner={owner}
+        openFrom={openFrom}
+        recent={recent}
         onClose={close}
         onSelect={selectRegion}
         onTab={setTab}
+        onMinimize={minimize}
+        onRestore={restore}
+        onRecenter={recenter}
+        onSheet={setSheet}
         onHoverRange={setActiveRange}
         onOverlay={setOverlay}
       />
       </RouteGraphContext>
 
-      <footer className="attribution">
+      <footer className="attribution" inert={modal}>
         {t('footer.cables')} ©{' '}
         <a href="https://www.submarinecablemap.com/" target="_blank" rel="noreferrer">
           TeleGeography
