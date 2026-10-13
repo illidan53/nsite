@@ -1,4 +1,4 @@
-// global-network.nphunter.gg：私有 S3 桶 + CloudFront（OAC）+ ACM 证书 + Route 53 别名记录，
+// global-network.nphunter.net：私有 S3 桶 + CloudFront（OAC）+ ACM 证书 + Route 53 别名记录，
 // 以及供 GitHub Actions 通过 OIDC 部署静态文件的 IAM 角色。
 // 本地执行：cd infra && npm ci && AWS_PROFILE=nphunter-sso pulumi up -s prod
 

@@ -44,9 +44,9 @@ npm run dev      # http://127.0.0.1:5173
 
 ## 部署
 
-线上地址：https://global-network.nphunter.gg
+线上地址：https://global-network.nphunter.net
 
-- **基础设施**：`infra/`（Pulumi TypeScript，项目 `nsite-infra`，stack `prod`），AWS 账号与 nphunter.gg 相同（`nphunter-sso` profile，us-east-1）。
+- **基础设施**：`infra/`（Pulumi TypeScript，项目 `nsite-infra`，stack `prod`），AWS 账号与 nphunter.net 相同（`nphunter-sso` profile，us-east-1）。
   - `/geo` 行为挂了 CloudFront Function `nsite-viewer-geo`（代码在 `infra/geo-function.js`）。它读取 CloudFront-Viewer-* 请求头，直接在边缘返回访问者的大致位置，不回源、不缓存。
   - `/api/*` 转发到 Lambda `nsite-api`（代码在 `api/`）。
     - 函数 URL 只允许这个 CloudFront 分发通过 OAC 调用；测量记录存在 DynamoDB 表 `nsite-measurements`；每天最多 50 次测量。
@@ -57,7 +57,7 @@ npm run dev      # http://127.0.0.1:5173
       ```
     - 站长 IP 变了之后，重新设置 `ownerIps` 并执行 `pulumi up` 即可。
   - 私有 S3 桶 `nsite-global-network`，经 CloudFront OAC 访问；
-  - ACM 证书用 DNS 验证，Route 53 的 `nphunter.gg` 托管区里有 A/AAAA 别名记录；
+  - ACM 证书用 DNS 验证，Route 53 的 `nphunter.net` 托管区里有 A/AAAA 别名记录；
   - GitHub OIDC 部署角色 `nsite-github-deploy`，只允许 `illidan53/nsite` 的 `main` 分支使用。
 
   ```bash

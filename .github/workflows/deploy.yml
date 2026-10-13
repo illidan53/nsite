@@ -21,7 +21,7 @@ env:
   AWS_DEPLOY_ROLE_ARN: arn:aws:iam::612153676415:role/nsite-github-deploy
   S3_BUCKET: nsite-global-network
   CLOUDFRONT_DISTRIBUTION_ID: EPWME9SQHEM2B
-  PUBLIC_URL: https://global-network.nphunter.gg
+  PUBLIC_URL: https://global-network.nphunter.net
 
 jobs:
   deploy:

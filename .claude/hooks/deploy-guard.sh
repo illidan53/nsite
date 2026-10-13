@@ -30,7 +30,7 @@ if [ -n "$infra" ]; then
   steps+=("这些基础设施/后端文件有改动：${infra}—— 先 cd infra && AWS_PROFILE=nphunter-sso pulumi preview -s illidan53/nsite-infra/prod 确认，再 pulumi up --yes")
 fi
 steps+=("git push origin main，等 GitHub Actions 的 Deploy 跑完并成功")
-steps+=("在 https://global-network.nphunter.gg 上核对改动已生效")
+steps+=("在 https://global-network.nphunter.net 上核对改动已生效")
 list=""
 for i in "${!steps[@]}"; do list="$list$((i + 1))) ${steps[$i]}；"$'\n'; done
 list="${list}如果检查失败、AWS SSO 过期或需要用户决定，停下来说明具体阻塞点，不要硬推。"
