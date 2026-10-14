@@ -9,6 +9,7 @@ import { countryMetrics, expandedCountries, visibleProvinceLabels, type Pov } fr
 import { PROVIDER_BY_ID } from '../lib/providers.ts';
 import type { EstimatedRoute, Segment } from '../lib/routing.ts';
 import type { GlobeTheme } from '../lib/themes.ts';
+import { throttleLatest } from '../lib/throttleLatest.ts';
 import type { Cable, Region } from '../lib/types.ts';
 import { useWindowSize } from '../lib/useWindowSize.ts';
 
@@ -83,7 +84,9 @@ function withAlpha(hex: string, alpha: number) {
 }
 
 // 不依赖状态的访问器放在模块级，保持引用稳定（react-globe.gl 按引用比较 props，变化就会重算整层）。
-const polygonSide = () => 'rgba(0,0,0,0)';
+// 空字符串让 three-globe 不生成侧面；透明颜色仍会生成从球心延伸的三角形，
+// 每次鼠标拾取也会检测这些看不见的面。
+const polygonSide = () => '';
 const pointLat = (p: LngLat) => p[1];
 const pointLng = (p: LngLat) => p[0];
 const isRoute = (d: object) => (d as PathDatum).type === 'route';
@@ -124,18 +127,13 @@ function GlobeView(props: Props) {
   useEffect(() => {
     admin1ByCountry().then(setAdmin1, () => setAdmin1(new Map()));
   }, []);
-  // 旋转、缩放时 onZoom 每帧触发；最多每 250 ms 更新一次视角，停下后再补一次。
-  const povTimer = useRef<{ last: number; pending?: ReturnType<typeof setTimeout> }>({ last: 0 });
+  // 镜头仍由 Three.js 逐帧更新，React 只同步省界、标签和标记尺寸。
+  // 固定窗口内取最新视角，避免每次输入都把尾帧再往后推 250 ms。
+  const povUpdates = useMemo(() => throttleLatest(setPov, 100), []);
+  useEffect(() => () => povUpdates.cancel(), [povUpdates]);
   const handleZoom = useCallback((p: Pov) => {
-    const tm = povTimer.current;
-    clearTimeout(tm.pending);
-    const apply = () => {
-      tm.last = Date.now();
-      setPov({ lat: p.lat, lng: p.lng, altitude: p.altitude });
-    };
-    if (Date.now() - tm.last > 250) apply();
-    else tm.pending = setTimeout(apply, 250);
-  }, []);
+    povUpdates.update({ lat: p.lat, lng: p.lng, altitude: p.altitude });
+  }, [povUpdates]);
   const metrics = useMemo(() => countryMetrics(countries), [countries]);
   const expandedKey = useMemo(() => expandedCountries(metrics, pov, h).join(','), [metrics, pov, h]);
   const countryByIso = useMemo(() => new Map(countries.map((c) => [c.properties.iso3, c])), [countries]);
@@ -387,7 +385,7 @@ function GlobeView(props: Props) {
       pointColor={pointColor}
       pointAltitude={pointAltitude}
       pointRadius={pointRadius}
-      pointsTransitionDuration={300}
+      pointsTransitionDuration={0}
       pointLabel={pointLabel}
       onPointClick={handlePointClick}
       ringsData={rings}
