@@ -7,7 +7,7 @@
 //
 // 选项：--nearest <n|all>  每家厂商离起点最近的 n 个区域（默认 3）
 //       --probes <k>       每个起点地区的探针数（默认 2）
-//       --split <CC,...>   细分到省/州的国家（默认 US,CA,BR,RU,CN,IN,AU；传 none 表示不细分）
+//       --split <CC,...>   细分到省/州的国家（默认 SPLIT_ADM0 里的 25 个；传 none 表示不细分）
 //       --cells <id,...>   只测这些起点地区（如 JP,IE 或 US-NJ），用于补测
 //       --skip-measured    跳过 docs/measured.json 里已经测到过（至少一个探针到达）的「起点地区-区域」组合
 //       --max-credits <n>  计划超过这个积分就不创建（run 和 run --resume 都必填）
@@ -47,7 +47,16 @@ const DATA = path.join(ROOT, 'public', 'data');
 const RUNS = path.join(ROOT, 'docs', 'measurements');
 const MEASURED = path.join(ROOT, 'docs', 'measured.json');
 const ATLAS = 'https://atlas.ripe.net/api/v2';
-const DEFAULT_SPLIT = ['US', 'CA', 'BR', 'RU', 'CN', 'IN', 'AU'];
+/**
+ * 细分到省/州的国家，以及它们在 Natural Earth 里的 ISO3（排掉挂在别国名下的省级单位，如 US-PR 属于 PRI、乌克兰的克里米亚记在 RUS 名下）。
+ * 选的是面积大、各地延迟差别明显的国家。英法意西荷波等的一级行政区是郡 / 省（英国 149 个），彼此离得近、测出来几乎一样，不细分。
+ */
+const SPLIT_ADM0: Record<string, string> = {
+  US: 'USA', CA: 'CAN', BR: 'BRA', RU: 'RUS', CN: 'CHN', IN: 'IND', AU: 'AUS',
+  JP: 'JPN', ID: 'IDN', MX: 'MEX', AR: 'ARG', ZA: 'ZAF', KZ: 'KAZ', TR: 'TUR', UA: 'UKR', SE: 'SWE',
+  PH: 'PHL', DE: 'DEU', TH: 'THA', VN: 'VNM', IR: 'IRN', SA: 'SAU', NG: 'NGA', PK: 'PAK', EG: 'EGY',
+};
+const DEFAULT_SPLIT = Object.keys(SPLIT_ADM0);
 
 type RunOptions = Omit<PlanOptions, 'skip'> & { split: string[]; skipped?: number };
 
@@ -64,6 +73,14 @@ interface RunFile {
 
 const BOOLEAN_FLAGS = new Set(['yes', 'skip-measured']);
 const VALUE_FLAGS = new Set(['nearest', 'probes', 'split', 'cells', 'max-credits', 'resume']);
+
+/** --split 只能用 SPLIT_ADM0 里的国家：没有 ISO3 就排不掉挂在别国名下的省级单位。 */
+function splitList(v: string) {
+  const list = v.split(',').map((s) => s.trim().toUpperCase());
+  const unknown = list.filter((cc) => !SPLIT_ADM0[cc]);
+  if (unknown.length) throw new Error(`--split 不认识 ${unknown.join(',')}：先在 SPLIT_ADM0 里加上它们的 ISO3`);
+  return list;
+}
 
 /** 选项写错（少了值、拼错、不是整数）时直接报错：宁可不跑，也不要按默认值花积分。 */
 function parseArgs(argv: string[]) {
@@ -94,7 +111,7 @@ function parseArgs(argv: string[]) {
     opts: {
       nearest: nearest === 'all' ? ('all' as const) : Math.max(1, int('nearest', 3)!),
       probes: Math.max(1, int('probes', 2)!),
-      split: split === undefined ? DEFAULT_SPLIT : split === 'none' ? [] : split.split(',').map((s) => s.trim().toUpperCase()),
+      split: split === undefined ? DEFAULT_SPLIT : split === 'none' ? [] : splitList(split),
       excludeAsns: PROVIDERS.flatMap((p) => p.asns),
     },
     cells: only ? only.split(',').map((s) => s.trim().toUpperCase()) : null,
@@ -181,8 +198,6 @@ async function loadPrevious(targets: BatchTarget[]): Promise<{ failed: ReturnTyp
 
 type Admin1 = Feature<Geometry, { iso: string; adm0: string; labelLat: number; labelLng: number; area: number | null }>;
 
-/** 分省国家在 Natural Earth 里的 ISO3：排掉挂在别国名下的省级单位（如 US-PR 属于 PRI）。 */
-const SPLIT_ADM0: Record<string, string> = { US: 'USA', CA: 'CAN', BR: 'BRA', RU: 'RUS', CN: 'CHN', IN: 'IND', AU: 'AUS' };
 /** 探针落在省界外时，离最近的省界顶点超过这个距离就不用（多半是坐标或国家代码不准）。 */
 const MAX_OFF_BORDER_KM = 100;
 
@@ -194,7 +209,7 @@ async function buildCells(probes: BatchProbe[], split: string[]): Promise<BatchC
   // 只要正式的省级代码（Natural Earth 里 AU-X02~ 这类带 ~ 的前端也认不出）
   const admin1 = (feature(topo, topo.objects.admin1) as unknown as { features: Admin1[] }).features.filter((f) => {
     const cc = f.properties.iso?.slice(0, 2);
-    return split.includes(cc) && /^[A-Z]{2}-[A-Z0-9]{1,3}$/.test(f.properties.iso.toUpperCase()) && (!SPLIT_ADM0[cc] || f.properties.adm0 === SPLIT_ADM0[cc]);
+    return split.includes(cc) && /^[A-Z]{2}-[A-Z0-9]{1,3}$/.test(f.properties.iso.toUpperCase()) && f.properties.adm0 === SPLIT_ADM0[cc];
   });
   const boxes = admin1.map((f) => geoBounds(f));
   const inBox = (i: number, lat: number, lng: number) => {
