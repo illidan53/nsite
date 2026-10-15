@@ -1555,6 +1555,12 @@ button {
 .rtt-none {
   color: var(--faint);
 }
+.rtt-unreached {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+  cursor: help;
+}
 .lat-track {
   position: relative;
   height: 4px;

@@ -143,6 +143,58 @@ export function plan(cells: BatchCell[], targets: BatchTarget[], opts: PlanOptio
   return out;
 }
 
+/** 被安排测量至少 2 次、却一次结果都没返回的探针（多半长期掉线或拒绝 traceroute）：再选它也白等。 */
+export function silentProbes(scheduled: number[], returned: Set<number>): number[] {
+  const n = new Map<number, number>();
+  for (const id of scheduled) n.set(id, (n.get(id) ?? 0) + 1);
+  return [...n].filter(([id, k]) => k >= 2 && !returned.has(id)).map(([id]) => id).sort((a, b) => a - b);
+}
+
+export interface PairRequest {
+  cell: string;
+  region: string;
+  /** 这次要加几个探针。 */
+  probes: number;
+}
+
+/**
+ * 只测指定的「起点地区-区域」组合（补列表前几行、给只有 1 个结果的组合补探针、指定的枢纽区域）。
+ * used：这个组合已经测过的探针，不再选。按目标区域分组成测量（超过 1000 个探针时拆开）。
+ */
+export function planPairs(
+  cells: BatchCell[],
+  targets: BatchTarget[],
+  pairs: PairRequest[],
+  opts: Pick<PlanOptions, 'excludeAsns' | 'excludeProbes'> & { used?: Map<string, number[]> },
+): { planned: PlannedMeasurement[]; skipped: (PairRequest & { why: string })[] } {
+  const cellById = new Map(cells.map((c) => [c.id, c]));
+  const targetById = new Map(targets.map((t) => [t.region, t]));
+  const byRegion = new Map<string, PlannedMeasurement>();
+  const skipped: (PairRequest & { why: string })[] = [];
+  for (const req of pairs) {
+    const cell = cellById.get(req.cell);
+    const target = targetById.get(req.region);
+    if (!cell || !target) {
+      skipped.push({ ...req, why: !cell ? 'no cell' : 'no target' });
+      continue;
+    }
+    const exclude = [...(opts.excludeProbes?.[target.protocol] ?? []), ...(opts.used?.get(pairKey(req.cell, req.region)) ?? [])];
+    const probes = chooseProbes(cell, req.probes, opts.excludeAsns, exclude);
+    if (!probes.length) {
+      skipped.push({ ...req, why: 'no probe' });
+      continue;
+    }
+    const m = byRegion.get(target.region) ?? { target, probes: [] };
+    for (const probe of probes) m.probes.push({ probe, cell: cell.id });
+    byRegion.set(target.region, m);
+  }
+  const planned: PlannedMeasurement[] = [];
+  for (const m of byRegion.values()) {
+    for (let i = 0; i < m.probes.length; i += MAX_PROBES_PER_MEASUREMENT) planned.push({ target: m.target, probes: m.probes.slice(i, i + MAX_PROBES_PER_MEASUREMENT) });
+  }
+  return { planned, skipped };
+}
+
 export function planCost(measurements: PlannedMeasurement[]) {
   const results = measurements.reduce((s, m) => s + m.probes.length, 0);
   return { measurements: measurements.length, results, credits: results * CREDITS_PER_RESULT };

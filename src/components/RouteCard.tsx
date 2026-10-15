@@ -1,7 +1,7 @@
 import { useRef, type KeyboardEvent } from 'react';
 import { haversineKm } from '../lib/geo.ts';
 import { useI18n } from '../lib/i18n.tsx';
-import { bestRtt, type MeasuredOrigin } from '../lib/measured.ts';
+import { mineFor, type MeasuredOrigin } from '../lib/measured.ts';
 import { providerName, regionName } from '../lib/names.ts';
 import type { Place } from '../lib/places.ts';
 import { PROVIDER_BY_ID } from '../lib/providers.ts';
@@ -32,7 +32,8 @@ interface Props {
   tab: RouteTab;
   route: EstimatedRoute | null;
   measuredData: MeasuredData | null;
-  measuredOrigin: MeasuredOrigin | null;
+  /** 可用的实测地区（自己省优先，再按距离）；这个数据中心用哪个由 mineFor 决定。 */
+  measuredOrigins: MeasuredOrigin[];
   anchorProbes: AnchorProbe[];
   publicTarget: TestTarget | undefined;
   owner: boolean;
@@ -50,7 +51,7 @@ interface Props {
 
 /** 选中数据中心后的路线卡：不挡地球（宽屏停靠右侧，窄屏从底部弹出），三类数据并排对比。 */
 export default function RouteCard(props: Props) {
-  const { open, dock, mobile, sheet, origin, place, onLand, target, tab, route, measuredData, measuredOrigin, steps } = props;
+  const { open, dock, mobile, sheet, origin, place, onLand, target, tab, route, measuredData, measuredOrigins, steps } = props;
   const { lang, t, pick } = useI18n();
   const tabsRef = useRef<HTMLDivElement>(null);
   const p = PROVIDER_BY_ID[target.provider];
@@ -59,12 +60,12 @@ export default function RouteCard(props: Props) {
     ? [place?.admin1 ? pick(place.admin1.name, place.admin1.nameZh) : null, pick(country.name, country.nameZh)].filter(Boolean).join(', ')
     : t(onLand ? 'place.unknown' : 'place.ocean');
 
+  const { ms: targetMine, unreached: targetUnreached, origin: measuredOrigin } = mineFor(measuredOrigins, target, origin);
   const pair = measuredOrigin?.cell.regions[target.id];
-  const targetMine = bestRtt(pair);
   const runDate = pair ? (measuredData?.runs[pair.run]?.createdAt.slice(0, 10) ?? '') : '';
   const tabValue = (s: RouteTab) => {
     if (s === 'estimate') return route && onLand ? `${fmtMs(route.rttMs)} ms` : '—';
-    if (s === 'mine') return targetMine !== null ? `${fmtMs(targetMine)} ms` : '—';
+    if (s === 'mine') return targetMine !== null ? `${fmtMs(targetMine)} ms` : targetUnreached ? t('mine.unreachedShort') : '—';
     const a = target.anchors[0];
     return a ? t(a.sameProvider ? 'tab.anchorSame' : 'tab.anchorProxy') : t('tab.none');
   };
@@ -72,8 +73,8 @@ export default function RouteCard(props: Props) {
     s === 'estimate'
       ? t('src.qual.estimate')
       : s === 'mine'
-        ? targetMine !== null && measuredOrigin
-          ? t('src.qual.mineFrom', { cell: measuredOrigin.id, date: runDate })
+        ? (targetMine !== null || targetUnreached) && measuredOrigin
+          ? t('src.qual.mineFrom', { cell: measuredOrigin.kind === 'own' ? measuredOrigin.id : `${measuredOrigin.id} · ${fmtKm(measuredOrigin.km)} km`, date: runDate })
           : t('src.qual.mineNone')
         : t('src.qual.atlas');
 
@@ -196,7 +197,7 @@ export default function RouteCard(props: Props) {
               <span className="src-swatch" aria-hidden="true" />
               <span className="ellipsis">{t(`tab.${s}`)}</span>
             </span>
-            <span className={`tab-value ${s === 'atlas' ? 'tab-value-text' : ''}`}>{tabValue(s)}</span>
+            <span className={`tab-value ${s === 'atlas' || (s === 'mine' && targetUnreached) ? 'tab-value-text' : ''}`}>{tabValue(s)}</span>
             <span className="tab-sub">{tabSub(s)}</span>
           </button>
         ))}

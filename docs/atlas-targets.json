@@ -2483,7 +2483,7 @@
    "city": "Osaka",
    "host": "cos.ap-osaka.myqcloud.com",
    "ip": "43.172.132.18",
-   "method": "icmp",
+   "method": "tcp443",
    "source": {
     "zh": "腾讯云 COS 区域端点",
     "en": "Tencent Cloud COS regional endpoint",

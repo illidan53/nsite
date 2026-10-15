@@ -3,7 +3,7 @@ import { cellOf, listMeasurements, measurementResults, startMeasurement, type Me
 import type { TraceResult } from '../lib/atlas.ts';
 import { haversineKm } from '../lib/geo.ts';
 import { useI18n } from '../lib/i18n.tsx';
-import { fasterThanLight, type MeasuredOrigin } from '../lib/measured.ts';
+import { fasterThanLight, type MeasuredOrigin, type OriginKind } from '../lib/measured.ts';
 import type { Place } from '../lib/places.ts';
 import type { MeasuredData, Region, TestTarget } from '../lib/types.ts';
 import type { TraceOverlay } from './GlobeView.tsx';
@@ -38,10 +38,13 @@ interface Entry {
   target: string;
   cell: string;
   /** 批量结果借用了同一国家里最近的已测地区。 */
-  near: boolean;
+  /** 数据来自哪种地区，借来的相距多远（km）。 */
+  from: { kind: OriginKind; km: number };
   probes: MeasureProbe[];
   /** 批量结果里已知的到达 RTT（按探针）。 */
   known: Map<number, number | null>;
+  /** 批量结果里每个探针来自哪次测量（补测过的组合会有好几次）。 */
+  msmOf?: Map<number, number>;
 }
 
 function lastRtt(r: TraceResult | undefined) {
@@ -90,9 +93,10 @@ export default function PersonalMeasure({ region, origin, place, publicTarget, m
         msmId: pair.msm,
         target: pair.target,
         cell: measuredOrigin.id,
-        near: !measuredOrigin.exact,
+        from: { kind: measuredOrigin.kind, km: measuredOrigin.km },
         probes: probes.sort((a, b) => a.distanceKm - b.distanceKm),
         known: new Map(pair.results.map((r) => [r.probe, r.rtt])),
+        msmOf: new Map(pair.results.map((r) => [r.probe, r.msm ?? pair.msm])),
       });
     }
     // 只收对公开地址的测量；早期对同城锚点的代测属于“锚点参考”，不混在这里。
@@ -105,7 +109,7 @@ export default function PersonalMeasure({ region, origin, place, publicTarget, m
         msmId: m.msmId,
         target: m.target,
         cell: m.origin.cell,
-        near: false,
+        from: { kind: 'own', km: 0 },
         probes: m.probes,
         known: new Map(),
       });
@@ -122,9 +126,17 @@ export default function PersonalMeasure({ region, origin, place, publicTarget, m
     let timer: ReturnType<typeof setTimeout> | undefined;
     setResults(null);
     setSelected(0);
-    const ids = entry.kind === 'batch' ? entry.probes.map((p) => p.id) : undefined;
+    // 批量结果按测量号分组读取（补测过的组合，探针分在几次测量里）
+    const groups = new Map<number, number[] | undefined>();
+    if (entry.kind === 'batch') {
+      for (const p of entry.probes) {
+        const msm = entry.msmOf?.get(p.id) ?? entry.msmId;
+        groups.set(msm, [...(groups.get(msm) ?? []), p.id]);
+      }
+    } else groups.set(entry.msmId, undefined);
     const load = () =>
-      measurementResults(entry.msmId, ctrl.signal, ids)
+      Promise.all([...groups].map(([msm, ids]) => measurementResults(msm, ctrl.signal, ids)))
+        .then((lists) => lists.flat())
         .then((r) => {
           setResults(r);
           const fresh = entry.kind === 'single' && Date.now() - Date.parse(entry.createdAt) < POLL_WINDOW_MS;
@@ -145,7 +157,9 @@ export default function PersonalMeasure({ region, origin, place, publicTarget, m
     setBusy(true);
     setError(null);
     try {
-      const m = await startMeasurement({ lat: origin.lat, lng: origin.lng, country: cell.country, cell: cell.cell, region: region.id });
+      // RIPE Atlas 把科索沃、北塞浦路斯的探针记在塞尔维亚、塞浦路斯名下：找探针时用 RIPE 的国家代码
+      const ripeCountry = ({ XK: 'RS', XN: 'CY' } as Record<string, string>)[cell.country] ?? cell.country;
+      const m = await startMeasurement({ lat: origin.lat, lng: origin.lng, country: ripeCountry, cell: cell.cell, region: region.id });
       setItems((prev) => [m, ...(prev ?? [])]);
       setEntryKey(`single-${m.msmId}`);
     } catch (err) {
@@ -159,6 +173,9 @@ export default function PersonalMeasure({ region, origin, place, publicTarget, m
   const trace = results?.find((r) => r.probeId === probe?.id) ?? null;
   const target = useMemo(() => ({ lat: region.lat, lng: region.lng, label: entry?.target ?? region.code, city: region.city }), [region, entry]);
   const lastHop = trace ? [...trace.hops].reverse().find((h) => h.minRtt !== null) : undefined;
+  // 补测过的组合里，选中的探针可能来自更早的一次测量：链接和时间跟着选中的探针走
+  const shownMsm = trace?.msmId ?? (probe && entry?.msmOf?.get(probe.id)) ?? entry?.msmId;
+  const shownAt = trace ? trace.timestamp : entry ? Date.parse(entry.createdAt) / 1000 : 0;
 
   useEffect(() => {
     if (!trace) onOverlay(null);
@@ -222,10 +239,10 @@ export default function PersonalMeasure({ region, origin, place, publicTarget, m
             </div>
           )}
           <p className="mine-meta">
-            {t(entry.kind === 'batch' ? 'mine.batch' : 'mine.single')} · {t(entry.near ? 'mine.fromNear' : 'mine.from', { cell: entry.cell })} ·{' '}
-            {t('mine.measuredAt', { ago: ago(Date.parse(entry.createdAt) / 1000, t) })} ·{' '}
-            <a href={`https://atlas.ripe.net/measurements/${entry.msmId}/`} target="_blank" rel="noreferrer">
-              {t('mine.link', { id: entry.msmId })}
+            {t(entry.kind === 'batch' ? 'mine.batch' : 'mine.single')} · {t(entry.from.kind === 'own' ? 'mine.from' : entry.from.kind === 'near' ? 'mine.fromNear' : 'mine.fromCountry', { cell: entry.cell, km: fmtKm(entry.from.km) })} ·{' '}
+            {t('mine.measuredAt', { ago: ago(shownAt, t) })} ·{' '}
+            <a href={`https://atlas.ripe.net/measurements/${shownMsm}/`} target="_blank" rel="noreferrer">
+              {t('mine.link', { id: shownMsm ?? '' })}
             </a>
           </p>
           {entry.kind === 'single' && results && results.length < entry.probes.length && (

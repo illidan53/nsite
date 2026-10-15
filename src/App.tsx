@@ -6,7 +6,7 @@ import type { RankedRegion } from './components/RegionList.tsx';
 import { whoami } from './lib/api.ts';
 import { loadAppData, type AppData } from './lib/data.ts';
 import { RouteGraphContext } from './lib/graphContext.ts';
-import { bestRtt, loadMeasured, measuredOriginFor } from './lib/measured.ts';
+import { loadMeasured, measuredOriginsFor, mineFor } from './lib/measured.ts';
 import { haversineKm } from './lib/geo.ts';
 import { useI18n, type Lang } from './lib/i18n.tsx';
 import { placeLayout, routeCamera, type Sheet, type Stage } from './lib/layout.ts';
@@ -87,20 +87,25 @@ export default function App() {
   );
 
   /** 点击位置对应的批量站长实测起点地区。 */
-  const measuredOrigin = useMemo(() => measuredOriginFor(measured, place, origin), [measured, place, origin]);
+  const measuredOrigins = useMemo(() => measuredOriginsFor(measured, place, origin), [measured, place, origin]);
 
   /** 全部数据中心（不受左上角厂商筛选影响），按估算 RTT 排序；有站长实测时一并带上（两者分开存放，不混算）。 */
   const rankedAll = useMemo<RankedRegion[]>(() => {
     if (!data || !origin) return [];
     return data.network.regions
-      .map((region) => ({
-        region,
-        distanceKm: haversineKm(origin.lat, origin.lng, region.lat, region.lng),
-        rttMs: estimateRtt(data.graph, sp, region, origin.lat, origin.lng),
-        mineMs: bestRtt(measuredOrigin?.cell.regions[region.id]),
-      }))
+      .map((region) => {
+        const mine = mineFor(measuredOrigins.usable, region, origin);
+        return {
+          region,
+          distanceKm: haversineKm(origin.lat, origin.lng, region.lat, region.lng),
+          rttMs: estimateRtt(data.graph, sp, region, origin.lat, origin.lng),
+          mineMs: mine.ms,
+          mineUnreached: mine.unreached,
+          mineFrom: mine.origin,
+        };
+      })
       .sort((a, b) => a.rttMs - b.rttMs);
-  }, [data, origin, sp, measuredOrigin]);
+  }, [data, origin, sp, measuredOrigins]);
 
   const route = useMemo(() => (data && sp && target ? routeTo(data.graph, sp, target) : null), [data, sp, target]);
 
@@ -420,7 +425,7 @@ export default function App() {
         onLand={onLand}
         enabled={enabled}
         measuredData={measured}
-        measuredOrigin={measuredOrigin}
+        measuredOrigins={measuredOrigins}
         all={rankedAll}
         target={target}
         tab={tab}

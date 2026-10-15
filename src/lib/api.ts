@@ -28,9 +28,16 @@ export interface Whoami {
   configured: boolean;
 }
 
+/**
+ * Natural Earth 里没有 ISO2（-99）的地区用的代码：北塞浦路斯用自定义的 XN（目前没有它自己的批量实测，网页如实显示“没有”），
+ * 索马里兰借用索马里（在 500 km 以内才会用上）。科索沃本来就是 XK。
+ */
+const NO_ISO2: Record<string, string> = { CYN: 'XN', SOL: 'SO' };
+
 /** 起点地区：优先用省/州（ISO 3166-2，如 US-NJ），否则用国家代码。 */
 export function cellOf(place: Place | null): { cell: string; country: string } | null {
-  const country = place?.country?.iso2;
+  const raw = place?.country?.iso2;
+  const country = raw === '-99' ? NO_ISO2[place?.country?.iso3 ?? ''] : raw;
   if (!country || !/^[A-Z]{2}$/.test(country)) return null;
   const iso = place?.admin1?.iso?.toUpperCase();
   return { cell: iso && /^[A-Z]{2}-[A-Z0-9]{1,3}$/.test(iso) ? iso : country, country };

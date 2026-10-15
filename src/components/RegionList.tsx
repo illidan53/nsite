@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from 
 import { useI18n } from '../lib/i18n.tsx';
 import { providerName, regionName } from '../lib/names.ts';
 import { PROVIDERS, PROVIDER_BY_ID } from '../lib/providers.ts';
+import type { MeasuredOrigin } from '../lib/measured.ts';
 import type { ProviderId, Region } from '../lib/types.ts';
 
 export interface RankedRegion {
@@ -11,6 +12,10 @@ export interface RankedRegion {
   rttMs: number;
   /** 站长实测（批量）里到达该区域的最低 RTT；没有测过或没到达时为 null。 */
   mineMs: number | null;
+  /** 测过但所有探针都没到达。 */
+  mineUnreached: boolean;
+  /** 实测值来自哪个地区（各行可能不同：每个数据中心取最近、测过它的地区）。 */
+  mineFrom: MeasuredOrigin | null;
 }
 
 export type SortBy = 'estimate' | 'mine';
@@ -52,13 +57,14 @@ export function chooserLists(sorted: RankedRegion[], providers: Set<ProviderId>,
 
 function RegionRow({ item, rank, max, top, hasMine, onSelect }: { item: RankedRegion; rank: number; max: number; top: boolean; hasMine: boolean; onSelect: (r: Region) => void }) {
   const { lang, t } = useI18n();
-  const { region, distanceKm, rttMs, mineMs } = item;
+  const { region, distanceKm, rttMs, mineMs, mineUnreached, mineFrom } = item;
+  const fromTitle = mineFrom ? t('row.mineFrom', { cell: mineFrom.id, km: fmtKm(mineFrom.km) }) : undefined;
   const p = PROVIDER_BY_ID[region.provider];
   const same = region.anchors.some((a) => a.sameProvider);
   const name = `${providerName(p, lang)} ${regionName(region, lang)}`;
   const aria =
     t('row.aria', { rank, name, code: region.code, city: region.city, km: fmtKm(distanceKm), est: fmtMs(rttMs) }) +
-    (mineMs !== null ? t('row.ariaMine', { ms: fmtMs(mineMs) }) : '') +
+    (mineMs !== null ? t('row.ariaMine', { ms: fmtMs(mineMs) }) : mineUnreached ? `, ${t('mine.unreachedTitle')}` : '') +
     (region.anchors.length ? `, ${t(same ? 'badge.live' : 'badge.proxy')}` : '');
   return (
     <li>
@@ -93,12 +99,17 @@ function RegionRow({ item, rank, max, top, hasMine, onSelect }: { item: RankedRe
           </span>
         </span>
         {hasMine && (
-          <span className={`rtt-col src-mine ${mineMs === null ? 'is-empty' : ''}`}>
+          <span className={`rtt-col src-mine ${mineMs === null && !mineUnreached ? 'is-empty' : ''}`}>
             {mineMs !== null ? (
-              <span className="rtt-num">
+              <span className="rtt-num" title={fromTitle}>
                 <span className="rtt-tag">{t('src.mine.short')}</span>
                 <span className="rtt-value">{fmtMs(mineMs)}</span>
                 <span className="rtt-unit">ms</span>
+              </span>
+            ) : mineUnreached ? (
+              <span className="rtt-num rtt-unreached" title={`${t('mine.unreachedTitle')} · ${fromTitle ?? ''}`}>
+                <span className="rtt-tag">{t('src.mine.short')}</span>
+                {t('mine.unreachedShort')}
               </span>
             ) : (
               <span className="rtt-none">—</span>

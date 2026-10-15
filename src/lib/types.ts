@@ -132,6 +132,10 @@ export interface TargetsData {
 export interface MeasuredResult {
   probe: number;
   rtt: number | null;
+  /** 来自另一次测量（补测、或超过 1000 个探针拆开的测量）时的测量号；没有就是 pair.msm。 */
+  msm?: number;
+  /** 这个探针用这种协议一律到不了（至少 2 次、一次都没到达）：它的空结果不代表数据中心不通。 */
+  bad?: true;
 }
 
 export interface MeasuredPair {

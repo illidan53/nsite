@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useI18n } from '../lib/i18n.tsx';
 import type { PlaceLayout, Sheet, Stage } from '../lib/layout.ts';
-import type { MeasuredOrigin } from '../lib/measured.ts';
+import type { MeasuredOrigins } from '../lib/measured.ts';
 import { providerName, regionName } from '../lib/names.ts';
 import type { Place } from '../lib/places.ts';
 import { PROVIDER_BY_ID } from '../lib/providers.ts';
@@ -10,7 +10,7 @@ import type { AnchorProbe, MeasuredData, ProviderId, Region, TestTarget } from '
 import type { TraceOverlay } from './GlobeView.tsx';
 import MiniPill from './MiniPill.tsx';
 import PlaceOverview from './PlaceOverview.tsx';
-import { ALL_PROVIDERS, FIRST, RegionChooser, chooserLists, fmtMs, type RankedRegion, type SortBy } from './RegionList.tsx';
+import { ALL_PROVIDERS, FIRST, RegionChooser, chooserLists, fmtKm, fmtMs, type RankedRegion, type SortBy } from './RegionList.tsx';
 import RouteCard from './RouteCard.tsx';
 
 export type RouteTab = 'estimate' | 'mine' | 'atlas';
@@ -28,7 +28,7 @@ interface Props {
   enabled: Set<ProviderId>;
   /** 批量站长实测结果，以及点击位置对应的起点地区。 */
   measuredData: MeasuredData | null;
-  measuredOrigin: MeasuredOrigin | null;
+  measuredOrigins: MeasuredOrigins;
   target: Region | null;
   tab: RouteTab;
   route: EstimatedRoute | null;
@@ -59,7 +59,8 @@ const seedProviders = (enabled: Set<ProviderId>) => new Set<ProviderId>(enabled.
  * route —— 停靠在一边（窄屏在底部）的路线卡，地球上画出路线。
  */
 export default function Panel(props: Props) {
-  const { stage, layout, sheet, origin, place, onLand, all, enabled, target, measuredData, measuredOrigin, openFrom, recent } = props;
+  const { stage, layout, sheet, origin, place, onLand, all, enabled, target, measuredData, measuredOrigins, openFrom, recent } = props;
+  const measuredOrigin = measuredOrigins.nearest;
   const { lang, t, pick } = useI18n();
   const overviewOpen = stage === 'overview';
 
@@ -79,22 +80,27 @@ export default function Panel(props: Props) {
   const [paging, setPaging] = useState({ key: limitKey, limit: FIRST });
   if (paging.key !== limitKey) setPaging({ key: limitKey, limit: FIRST });
 
-  const hasMine = all.some((r) => r.mineMs !== null);
+  const hasMine = all.some((r) => r.mineMs !== null || r.mineUnreached);
+  // 按实测排序：有值的按值，其次没测过的（按估算），最后是测了不通的
+  const mineKey = (r: RankedRegion) => r.mineMs ?? (r.mineUnreached ? 2e9 : 1e9);
   // 默认按模型估算（传入时已排好）；选“实测”时有实测的在前，其余仍按估算。
   const sorted = useMemo(
-    () => (sortBy === 'mine' && hasMine ? [...all].sort((a, b) => (a.mineMs ?? Infinity) - (b.mineMs ?? Infinity) || a.rttMs - b.rttMs) : all),
+    () => (sortBy === 'mine' && hasMine ? [...all].sort((a, b) => mineKey(a) - mineKey(b) || a.rttMs - b.rttMs) : all),
     [all, sortBy, hasMine],
   );
   const { ranked, visible, rank, hidden } = useMemo(() => chooserLists(sorted, providers, query), [sorted, providers, query]);
   const steps = target && visible.some((i) => i.region.id === target.id) ? visible : sorted;
 
   const runDate = (i: number) => measuredData?.runs[i]?.createdAt.slice(0, 10) ?? '';
-  const legendNote = measuredOrigin
-    ? t(measuredOrigin.exact ? 'src.mineFrom' : 'src.mineFromNear', {
-        cell: measuredOrigin.id,
-        date: runDate(Math.max(0, ...Object.values(measuredOrigin.cell.regions).map((p) => p.run))),
-      })
-    : t('src.mineNone');
+  const legendNote = !measuredOrigin
+    ? t('src.mineNone')
+    : measuredOrigin.tooFar
+      ? t('src.mineTooFar', { cell: measuredOrigin.id, km: fmtKm(measuredOrigin.km) })
+      : t(measuredOrigin.kind === 'own' ? 'src.mineFrom' : measuredOrigin.kind === 'near' ? 'src.mineFromNear' : 'src.mineFromCountry', {
+          cell: measuredOrigin.id,
+          km: fmtKm(measuredOrigin.km),
+          date: runDate(Math.max(0, ...Object.values(measuredOrigin.cell.regions).map((p) => p.run))),
+        });
 
   // ---------------------------------------------------------------- 窗口动画起点、滚动、焦点
   const fwRef = useRef<HTMLElement>(null);
@@ -287,7 +293,7 @@ export default function Panel(props: Props) {
           tab={props.tab}
           route={props.route}
           measuredData={measuredData}
-          measuredOrigin={measuredOrigin}
+          measuredOrigins={measuredOrigins.usable}
           anchorProbes={props.anchorProbes}
           publicTarget={props.publicTarget}
           owner={props.owner}

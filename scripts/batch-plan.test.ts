@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chooseProbes, failedProbes, nearestTargets, pairKey, plan, planCost, type BatchCell, type BatchProbe, type BatchTarget } from './batch-plan.ts';
+import { chooseProbes, failedProbes, nearestTargets, pairKey, plan, planCost, planPairs, silentProbes, type BatchCell, type BatchProbe, type BatchTarget } from './batch-plan.ts';
 
 const probe = (id: number, asn: number, lat: number, lng: number, stable = true): BatchProbe => ({ id, asn, lat, lng, cc: 'US', stable });
 const target = (region: string, provider: string, lat: number, lng: number): BatchTarget => ({
@@ -102,5 +102,34 @@ describe('failedProbes', () => {
         r(5, 'ICMP', null), r(5, 'ICMP', null), r(5, 'TCP', 12),
       ]),
     ).toEqual({ TCP: [1, 4], ICMP: [5] });
+  });
+});
+
+describe('silentProbes', () => {
+  it('flags probes scheduled at least twice that never returned a result', () => {
+    expect(silentProbes([1, 1, 2, 3, 3, 3], new Set([3]))).toEqual([1]);
+  });
+});
+
+describe('planPairs', () => {
+  const targets = [target('aws:us-east-1', 'aws', 38.9, -77.4), target('aws:eu-west-1', 'aws', 53.3, -6.3)];
+  const cells: BatchCell[] = [
+    { id: 'US-NJ', country: 'US', lat: 40.7, lng: -74, probes: [probe(1, 701, 40.7, -74), probe(3, 7922, 41, -74.5), probe(5, 3356, 40.6, -74.1)] },
+  ];
+
+  it('measures only the listed pairs and skips probes already used for that pair', () => {
+    const { planned, skipped } = planPairs(
+      cells,
+      targets,
+      [
+        { cell: 'US-NJ', region: 'aws:eu-west-1', probes: 2 },
+        { cell: 'US-NJ', region: 'aws:us-east-1', probes: 1 },
+        { cell: 'XX', region: 'aws:us-east-1', probes: 1 },
+      ],
+      { used: new Map([[pairKey('US-NJ', 'aws:us-east-1'), [1]]]) },
+    );
+    const byRegion = Object.fromEntries(planned.map((m) => [m.target.region, m.probes.map((p) => p.probe.id)]));
+    expect(byRegion).toEqual({ 'aws:eu-west-1': [1, 5], 'aws:us-east-1': [5] });
+    expect(skipped).toEqual([{ cell: 'XX', region: 'aws:us-east-1', probes: 1, why: 'no cell' }]);
   });
 });
