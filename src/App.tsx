@@ -3,7 +3,8 @@ import GlobeView, { type CameraTarget, type TraceOverlay } from './components/Gl
 import Panel, { type RouteTab } from './components/Panel.tsx';
 import TargetsPanel from './components/TargetsPanel.tsx';
 import type { RankedRegion } from './components/RegionList.tsx';
-import { whoami } from './lib/api.ts';
+import { cellOf, whoami } from './lib/api.ts';
+import { calibratedRtt } from './lib/calibration.ts';
 import { loadAppData, type AppData } from './lib/data.ts';
 import { RouteGraphContext } from './lib/graphContext.ts';
 import { loadMeasured, measuredOriginsFor, mineFor } from './lib/measured.ts';
@@ -11,7 +12,7 @@ import { haversineKm } from './lib/geo.ts';
 import { useI18n, type Lang } from './lib/i18n.tsx';
 import { placeLayout, routeCamera, type Sheet, type Stage } from './lib/layout.ts';
 import { providerName } from './lib/names.ts';
-import { lookupCountry, lookupPlace, type Place } from './lib/places.ts';
+import { lookupCountry, lookupPlace, originCountryOf, type Place } from './lib/places.ts';
 import { PROVIDERS } from './lib/providers.ts';
 import { estimateRtt, routeTo, shortestFrom } from './lib/routing.ts';
 import { THEMES, THEME_IDS, initialTheme, saveTheme, type ThemeId } from './lib/themes.ts';
@@ -89,23 +90,33 @@ export default function App() {
   /** 点击位置对应的批量站长实测起点地区。 */
   const measuredOrigins = useMemo(() => measuredOriginsFor(measured, place, origin), [measured, place, origin]);
 
+  /** 校准用的起点国家（ISO2）：国界缝隙里的点按附近的国家算，查不到时为 null。 */
+  const originCountry = useMemo(() => {
+    if (!data || !origin) return null;
+    const c = originCountryOf(data.countries, origin.lat, origin.lng, place?.country ?? null);
+    return cellOf({ country: c, admin1: null })?.country ?? null;
+  }, [data, origin, place]);
+
   /** 全部数据中心（不受左上角厂商筛选影响），按估算 RTT 排序；有站长实测时一并带上（两者分开存放，不混算）。 */
   const rankedAll = useMemo<RankedRegion[]>(() => {
     if (!data || !origin) return [];
     return data.network.regions
       .map((region) => {
         const mine = mineFor(measuredOrigins.usable, region, origin);
+        const physMs = estimateRtt(data.graph, sp, region, origin.lat, origin.lng);
         return {
           region,
           distanceKm: haversineKm(origin.lat, origin.lng, region.lat, region.lng),
-          rttMs: estimateRtt(data.graph, sp, region, origin.lat, origin.lng),
+          // 列表显示和排序用按实测校准过的估算；物理最短路径另存
+          rttMs: calibratedRtt(physMs, { originCountry, regionCountry: region.countryCode }),
+          physMs,
           mineMs: mine.ms,
           mineUnreached: mine.unreached,
           mineFrom: mine.origin,
         };
       })
       .sort((a, b) => a.rttMs - b.rttMs);
-  }, [data, origin, sp, measuredOrigins]);
+  }, [data, origin, originCountry, sp, measuredOrigins]);
 
   const route = useMemo(() => (data && sp && target ? routeTo(data.graph, sp, target) : null), [data, sp, target]);
 
@@ -433,6 +444,7 @@ export default function App() {
         anchorProbes={data.network.anchorProbes}
         publicTarget={target ? ipsData?.targets.find((x) => x.region === target.id) : undefined}
         owner={owner}
+        originCountry={originCountry}
         openFrom={openFrom}
         recent={recent}
         onClose={close}

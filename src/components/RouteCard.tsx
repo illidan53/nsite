@@ -1,4 +1,5 @@
 import { useRef, type KeyboardEvent } from 'react';
+import { calibratedRtt, calibrationRule } from '../lib/calibration.ts';
 import { haversineKm } from '../lib/geo.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { mineFor, type MeasuredOrigin } from '../lib/measured.ts';
@@ -37,6 +38,8 @@ interface Props {
   anchorProbes: AnchorProbe[];
   publicTarget: TestTarget | undefined;
   owner: boolean;
+  /** 校准用的起点国家（ISO2）。 */
+  originCountry: string | null;
   /** 步进（上一个 / 下一个）用的列表：选择器当前的顺序。 */
   steps: RankedRegion[];
   onBack: () => void;
@@ -63,8 +66,11 @@ export default function RouteCard(props: Props) {
   const { ms: targetMine, unreached: targetUnreached, origin: measuredOrigin } = mineFor(measuredOrigins, target, origin);
   const pair = measuredOrigin?.cell.regions[target.id];
   const runDate = pair ? (measuredData?.runs[pair.run]?.createdAt.slice(0, 10) ?? '') : '';
+  // 估算 = 物理最短路径 + 按站长实测校准的路由与排队开销
+  const estimateMs = route && onLand ? calibratedRtt(route.rttMs, { originCountry: props.originCountry, regionCountry: target.countryCode }) : null;
+  const rule = calibrationRule(props.originCountry, target.countryCode);
   const tabValue = (s: RouteTab) => {
-    if (s === 'estimate') return route && onLand ? `${fmtMs(route.rttMs)} ms` : '—';
+    if (s === 'estimate') return estimateMs !== null ? `${fmtMs(estimateMs)} ms` : '—';
     if (s === 'mine') return targetMine !== null ? `${fmtMs(targetMine)} ms` : targetUnreached ? t('mine.unreachedShort') : '—';
     const a = target.anchors[0];
     return a ? t(a.sameProvider ? 'tab.anchorSame' : 'tab.anchorProxy') : t('tab.none');
@@ -210,7 +216,7 @@ export default function RouteCard(props: Props) {
               <SourceBanner source="estimate" title={t('src.banner.estimate.title')}>
                 {t('src.banner.estimate')}
               </SourceBanner>
-              {onLand ? <RouteEstimate route={route} onHover={props.onHoverRange} /> : <p className="muted">{t('panel.oceanRoute')}</p>}
+              {onLand ? <RouteEstimate route={route} estimateMs={estimateMs} rule={rule} onHover={props.onHoverRange} /> : <p className="muted">{t('panel.oceanRoute')}</p>}
             </>
           )}
           {tab === 'mine' && (

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { calibratedRtt } from '../lib/calibration.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import type { PlaceLayout, Sheet, Stage } from '../lib/layout.ts';
 import type { MeasuredOrigins } from '../lib/measured.ts';
@@ -36,6 +37,8 @@ interface Props {
   /** 该区域的公开测试地址（站长实测的目标）。 */
   publicTarget: TestTarget | undefined;
   owner: boolean;
+  /** 校准用的起点国家（ISO2），见 App。 */
+  originCountry: string | null;
   /** 打开选择窗口的那次点击在屏幕上的位置（窗口从这里放大）。 */
   openFrom: { x: number; y: number } | null;
   recent: Region | null;
@@ -211,7 +214,7 @@ export default function Panel(props: Props) {
       : stage === 'route' && target
         ? t('a11y.route', {
             dc: `${providerName(PROVIDER_BY_ID[target.provider], lang)} ${regionName(target, lang)}`,
-            ms: props.route && onLand ? `${fmtMs(props.route.rttMs)} ms` : '—',
+            ms: props.route && onLand ? `${fmtMs(calibratedRtt(props.route.rttMs, { originCountry: props.originCountry, regionCountry: target.countryCode }))} ms` : '—',
           })
         : '';
 
@@ -297,6 +300,7 @@ export default function Panel(props: Props) {
           anchorProbes={props.anchorProbes}
           publicTarget={props.publicTarget}
           owner={props.owner}
+          originCountry={props.originCountry}
           steps={steps}
           onBack={() => props.onSelect(null)}
           onClose={props.onClose}

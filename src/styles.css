@@ -2015,6 +2015,16 @@ button {
 .rib-sub {
   --rib: var(--sub);
 }
+.rib-overhead {
+  --rib: var(--src-estimate);
+  background-image: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--rib) 18%, transparent) 4px 8px);
+}
+.tl-overhead::before {
+  background: var(--src-estimate);
+}
+.summary-grid > .summary-main {
+  grid-column: 1 / -1;
+}
 .rib-seg:hover,
 .rib-seg.is-hot {
   background: color-mix(in srgb, var(--rib) 40%, transparent);

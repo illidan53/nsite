@@ -8,8 +8,10 @@ import type { ProviderId, Region } from '../lib/types.ts';
 export interface RankedRegion {
   region: Region;
   distanceKm: number;
-  /** 模型估算 RTT。 */
+  /** 估算 RTT：物理最短路径按站长实测校准后的值（src/lib/calibration.ts），列表显示和排序都用它。 */
   rttMs: number;
+  /** 物理最短路径的 RTT（未校准）。 */
+  physMs: number;
   /** 站长实测（批量）里到达该区域的最低 RTT；没有测过或没到达时为 null。 */
   mineMs: number | null;
   /** 测过但所有探针都没到达。 */

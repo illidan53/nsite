@@ -91,6 +91,26 @@ export function lookupCountry(countries: CountryFeature[], lat: number, lng: num
   return find(countryIndex, lng, lat)?.properties ?? null;
 }
 
+/**
+ * 点击处所在国家：先用点在多边形里的结果；落在国界缝隙里（简化后的海岸线，如厦门、深圳南山）时，
+ * 按 1–30 km 的同心圆在 16 个方向上找，取最先碰到的那一圈里最多的国家。海上远处仍为 null。
+ */
+export function originCountryOf(countries: CountryFeature[], lat: number, lng: number, place: CountryProps | null): CountryProps | null {
+  if (place) return place;
+  for (const km of [1, 2, 3, 5, 8, 12, 20, 30]) {
+    const hits = new Map<string, { c: CountryProps; n: number }>();
+    for (let i = 0; i < 16; i++) {
+      const b = (i * Math.PI) / 8;
+      const dLat = (km / 111.2) * Math.cos(b);
+      const dLng = (km / (111.2 * Math.max(0.05, Math.cos((lat * Math.PI) / 180)))) * Math.sin(b);
+      const c = lookupCountry(countries, lat + dLat, lng + dLng);
+      if (c) hits.set(c.iso3, { c, n: (hits.get(c.iso3)?.n ?? 0) + 1 });
+    }
+    if (hits.size) return [...hits.values()].sort((a, b) => b.n - a.n)[0].c;
+  }
+  return null;
+}
+
 export async function lookupPlace(countries: CountryFeature[], lat: number, lng: number): Promise<Place> {
   const country = lookupCountry(countries, lat, lng);
   if (!country) return { country: null, admin1: null };

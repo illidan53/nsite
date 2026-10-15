@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { RTT_CALIBRATION } from '../lib/calibration.ts';
 import { useI18n } from '../lib/i18n.tsx';
 import { endName } from '../lib/names.ts';
 import { ACCESS_RTT_MS, FIBER_KM_PER_MS, LAND_INFLATION, type EstimatedRoute, type Segment } from '../lib/routing.ts';
@@ -6,6 +7,10 @@ import { fmtKm, fmtMs } from './RegionList.tsx';
 
 interface Props {
   route: EstimatedRoute | null;
+  /** 按站长实测校准后的估算 RTT（物理最短路径 + 路由与排队开销）；没有时只显示物理路径。 */
+  estimateMs: number | null;
+  /** 校准用了哪条规则（决定开销那一行怎么解释）。 */
+  rule: 'k' | 'into' | 'out';
   onHover: (range: [number, number] | null) => void;
 }
 
@@ -42,13 +47,17 @@ function groupSegments(segments: Segment[]): Group[] {
   return groups;
 }
 
-export default function RouteEstimate({ route, onHover }: Props) {
+/** 时间线和延迟构成条里“路由与排队开销”那一项的编号（不对应地球上的路段）。 */
+const OVERHEAD = -1;
+
+export default function RouteEstimate({ route, estimateMs, rule, onHover }: Props) {
   const { lang, t } = useI18n();
   const groups = useMemo(() => (route ? groupSegments(route.segments) : []), [route]);
   const [open, setOpen] = useState<number | null>(null);
   /** 延迟构成条和时间线里同时高亮的那一组。 */
   const [hot, setHot] = useState<number | null>(null);
   const items = useRef<(HTMLLIElement | null)[]>([]);
+  const overheadRef = useRef<HTMLLIElement>(null);
   const name = (e: Segment['from']) => endName(e, lang, t);
 
   if (!route) {
@@ -57,12 +66,14 @@ export default function RouteEstimate({ route, onHover }: Props) {
 
   const enter = (gi: number) => {
     setHot(gi);
-    onHover([groups[gi].start, groups[gi].end]);
+    onHover(gi === OVERHEAD ? null : [groups[gi].start, groups[gi].end]);
   };
   const leave = () => {
     setHot(null);
     onHover(null);
   };
+  const total = estimateMs ?? route.rttMs;
+  const overheadMs = Math.max(0, total - route.rttMs);
   const pathOf = (g: Group) => (g.kind === 'access' ? t('est.access', { ms: ACCESS_RTT_MS }) : `${name(g.segments[0].from)} → ${name(g.segments[g.segments.length - 1].to)}`);
   const subCount = route.segments.filter((s) => s.kind === 'sub').length;
   return (
@@ -70,7 +81,7 @@ export default function RouteEstimate({ route, onHover }: Props) {
       <div className="latency-ribbon">
         <div className="ribbon-head">
           <span className="summary-label">{t('route.budget')}</span>
-          <b>{fmtMs(route.rttMs)} ms</b>
+          <b>{fmtMs(total)} ms</b>
         </div>
         <div className="ribbon-bar">
           {groups.map((g, gi) => (
@@ -91,16 +102,39 @@ export default function RouteEstimate({ route, onHover }: Props) {
               }}
             >
               {/* 太窄的段只留颜色，数值在提示和读屏标签里 */}
-              {g.rttMs / route.rttMs >= 0.1 ? `+${fmtMs(g.rttMs)}` : ''}
+              {g.rttMs / total >= 0.1 ? `+${fmtMs(g.rttMs)}` : ''}
             </button>
           ))}
+          {overheadMs > 0.05 && (
+            <button
+              className={`rib-seg rib-overhead ${hot === OVERHEAD ? 'is-hot' : ''}`}
+              style={{ flex: `${overheadMs} 1 0` }}
+              aria-label={t('route.segment', { kind: t('est.kind.overhead'), path: t('est.overheadShort'), ms: fmtMs(overheadMs), total: fmtMs(total) })}
+              title={`${t('est.kind.overhead')} · ${t('est.overheadShort')}`}
+              onMouseEnter={() => enter(OVERHEAD)}
+              onMouseLeave={leave}
+              onFocus={() => enter(OVERHEAD)}
+              onBlur={leave}
+              onClick={() => {
+                const el = overheadRef.current;
+                el?.scrollIntoView({ block: 'nearest' });
+                el?.focus({ preventScroll: true });
+              }}
+            >
+              {overheadMs / total >= 0.1 ? `+${fmtMs(overheadMs)}` : ''}
+            </button>
+          )}
         </div>
       </div>
 
       <div className="summary-grid">
-        <div>
+        <div className="summary-main">
           <span className="summary-label">{t('est.rtt')}</span>
-          <span className="summary-value">{fmtMs(route.rttMs)} ms</span>
+          <span className="summary-value">{fmtMs(total)} ms</span>
+        </div>
+        <div>
+          <span className="summary-label">{t('est.physical')}</span>
+          <span className="summary-value dim">{fmtMs(route.rttMs)} ms</span>
         </div>
         <div>
           <span className="summary-label">{t('est.floor')}</span>
@@ -193,6 +227,25 @@ export default function RouteEstimate({ route, onHover }: Props) {
             </li>
           );
         })}
+        {overheadMs > 0.05 && (
+          <li
+            ref={overheadRef}
+            className={`tl-item tl-overhead ${hot === OVERHEAD ? 'is-hot' : ''}`}
+            tabIndex={0}
+            onMouseEnter={() => enter(OVERHEAD)}
+            onMouseLeave={leave}
+            onFocus={() => enter(OVERHEAD)}
+            onBlur={leave}
+          >
+            <div className="tl-head">
+              <span className="tl-kind">{t('est.kind.overhead')}</span>
+              <span className="tl-rtt">
+                +{fmtMs(overheadMs)} ms <span className="tl-cum">{t('est.cumulative', { ms: fmtMs(total) })}</span>
+              </span>
+            </div>
+            <div className="tl-body muted">{t(`est.overhead.${rule}`, { k: RTT_CALIBRATION.k, into: RTT_CALIBRATION.intoChinaMs, out: RTT_CALIBRATION.outOfChinaMs })}</div>
+          </li>
+        )}
       </ol>
 
       <details className="assumptions">
